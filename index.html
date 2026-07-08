@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TarımTakip - Çiftçi İlaç Takip Sistemi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M2 22C2 16.5 6.5 12 12 12C17.5 12 22 16.5 22 22" stroke-linecap="round"/>
+                        <path d="M12 2V12" stroke-linecap="round"/>
+                        <path d="M12 2C8.5 5.5 6 9 6 12C6 14 7.5 15.5 9.5 15.5C11.5 15.5 12 14 12 12" stroke-linecap="round"/>
+                        <path d="M12 2C15.5 5.5 18 9 18 12C18 14 16.5 15.5 14.5 15.5C12.5 15.5 12 14 12 12" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>TarımTakip</h1>
+                    <span>İlaç & Etki Süresi Takibi</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" id="nav-dashboard">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    </svg>
+                    <span>Gösterge Paneli</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-settings">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Sistem Ayarları</span>
+                </a>
+                <button class="btn btn-primary add-spray-btn" id="open-modal-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Yeni İlaçlama Ekle
+                </button>
+                <button class="btn btn-secondary send-report-btn" id="send-report-btn" style="margin-top: 10px; width: 100%;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    E-posta Raporu Gönder
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="weather-widget">
+                    <div class="weather-info">
+                        <div class="weather-temp">28°C</div>
+                        <div class="weather-desc">Açık, Tarla Çalışması İçin Uygun</div>
+                    </div>
+                    <div class="weather-icon">☀️</div>
+                </div>
+                <p class="app-version">v1.1.0 • Çevrimdışı Çalışır</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-welcome">
+                    <h2>Hoş Geldiniz, Bereketli Günler!</h2>
+                    <p class="current-date" id="live-date">Yükleniyor...</p>
+                </div>
+                <div class="header-actions">
+                    <div class="quick-status">
+                        <span class="status-indicator online"></span>
+                        <span class="status-text">Veritabanı Aktif (Yerel)</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Stats Grid -->
+            <section class="stats-grid">
+                <div class="stat-card active-protection">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-data">
+                        <span class="stat-value" id="stat-active-sprays">0</span>
+                        <span class="stat-label">Aktif Korumadaki İlaçlar</span>
+                    </div>
+                    <div class="stat-trend neutral">Koruma Devam Ediyor</div>
+                </div>
+
+                <div class="stat-card harvest-warning">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+                    <div class="stat-data">
+                        <span class="stat-value" id="stat-harvest-waiting">0</span>
+                        <span class="stat-label">Hasat Yapılamaz (Kalıntı Süresi)</span>
+                    </div>
+                    <div class="stat-trend danger">Hasat Bekleme Süresi</div>
+                </div>
+
+                <div class="stat-card harvest-safe">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                    </div>
+                    <div class="stat-data">
+                        <span class="stat-value" id="stat-harvest-safe">0</span>
+                        <span class="stat-label">Güvenle Hasat Edilebilir</span>
+                    </div>
+                    <div class="stat-trend success">Kalıntı Süresi Bitti</div>
+                </div>
+
+                <div class="stat-card total-sprays">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                    </div>
+                    <div class="stat-data">
+                        <span class="stat-value" id="stat-total-sprays">0</span>
+                        <span class="stat-label">Toplam İlaçlama Kaydı</span>
+                    </div>
+                    <div class="stat-trend info">Arşiv Dahil</div>
+                </div>
+            </section>
+
+            <!-- Control Bar (Filter & Search) -->
+            <section class="control-bar">
+                <div class="search-box">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="search-input" placeholder="İlaç adı, ürün veya zararlı ara...">
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">Tümü</button>
+                    <button class="filter-tab" data-filter="active">Aktif Koruma</button>
+                    <button class="filter-tab" data-filter="waiting">Hasat Yasağı</button>
+                    <button class="filter-tab" data-filter="safe">Hasada Hazır</button>
+                    <button class="filter-tab" data-filter="expired">Süresi Dolan Koruma</button>
+                </div>
+            </section>
+
+            <!-- Spraying Lists Grid -->
+            <section class="sprays-container">
+                <div class="section-title-row">
+                    <h3>İlaçlama Takip Kartları</h3>
+                    <span class="results-count" id="results-count">0 kayıt bulundu</span>
+                </div>
+                <div class="sprays-grid" id="sprays-grid">
+                    <!-- Dynamic spray cards will be injected here via JavaScript -->
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-icon">🌱</div>
+                        <h4>Henüz kayıtlı ilaçlama bulunmuyor</h4>
+                        <p>Tarlanızdaki ilaçlama faaliyetlerini ve koruma sürelerini takip etmek için ilk kaydınızı oluşturun.</p>
+                        <button class="btn btn-primary" id="empty-state-btn">İlk İlaçlamayı Ekle</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Glassmorphic Add/Edit Modal Form -->
+    <div class="modal-backdrop" id="spray-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-title">Yeni İlaçlama Kaydı</h3>
+                <button class="close-btn" id="close-modal-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="spray-form" autocomplete="off">
+                <input type="hidden" id="spray-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="input-crop">Uygulanan Mahsul / Ürün *</label>
+                        <input type="text" id="input-crop" required placeholder="Örn: Domates, Elma, Buğday">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-pesticide">Kullanılan İlaç Adı *</label>
+                        <input type="text" id="input-pesticide" required placeholder="Örn: Kırmızı Örümcek İlacı, Bakır">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-date">İlaçlama Tarihi & Saati *</label>
+                        <input type="datetime-local" id="input-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-duration">İlaç Etki Süresi (Gün) *</label>
+                        <input type="number" id="input-duration" min="1" required placeholder="Örn: 14">
+                        <span class="field-hint">İlacın tarlayı/mahsulü koruduğu tahmini gün sayısı.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-phi">Hasat Bekleme Süresi (Gün - PHI) *</label>
+                        <input type="number" id="input-phi" min="0" required placeholder="Örn: 7">
+                        <span class="field-hint">Son ilaçlama ile hasat arasındaki bekleme süresi (Güvenlik Aralığı).</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-dosage">Dozaj / Uygulama Oranı</label>
+                        <input type="text" id="input-dosage" placeholder="Örn: 100 ml / 100 lt su">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="input-pest">Hedef Hastalık / Zararlı</label>
+                        <input type="text" id="input-pest" placeholder="Örn: Külleme, Yeşil Kurt, Yabancı Ot">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="input-notes">Özel Notlar & Tedbirler</label>
+                        <textarea id="input-notes" rows="3" placeholder="Hava sıcaklığı, rüzgar durumu veya koruyucu ekipman notları..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-modal-btn">İptal</button>
+                    <button type="submit" class="btn btn-success" id="save-btn">Kaydet ve Takibe Başla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-backdrop" id="settings-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Otomatik E-posta & Sistem Ayarları</h3>
+                <button class="close-btn" id="close-settings-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="settings-form" autocomplete="off">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input-smtp-server">SMTP Sunucusu (Host) *</label>
+                        <input type="text" id="input-smtp-server" required placeholder="Örn: smtp.gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-smtp-port">SMTP Portu *</label>
+                        <input type="number" id="input-smtp-port" required placeholder="Örn: 587">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-smtp-user">SMTP Kullanıcı Adı (Email) *</label>
+                        <input type="email" id="input-smtp-user" required placeholder="Örn: ornek@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-smtp-pass">SMTP Şifresi / Uygulama Şifresi *</label>
+                        <input type="password" id="input-smtp-pass" required placeholder="Gerekli şifre">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-recipient-email">Bildirim Gönderilecek Alıcı E-postası *</label>
+                        <input type="email" id="input-recipient-email" required placeholder="Örn: ornek_alici@gmail.com">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="test-email-btn">Bağlantıyı Test Et</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-settings-btn">İptal</button>
+                    <button type="submit" class="btn btn-success">Ayarları Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

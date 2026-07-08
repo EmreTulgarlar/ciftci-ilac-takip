@@ -1,0 +1,7 @@
+tarim_takip.db
+config.json
+__pycache__/
+.DS_Store
+*.pyc
+*.pyo
+.env
