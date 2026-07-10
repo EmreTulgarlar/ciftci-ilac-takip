@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container" id="app-container" style="display: none;">
         <!-- Sidebar / Navigation -->
         <aside class="sidebar">
             <div class="logo-area">
@@ -25,6 +25,13 @@
                 <div class="logo-text">
                     <h1>TarımTakip</h1>
                     <span>İlaç & Etki Süresi Takibi</span>
+                </div>
+            </div>
+            <div class="user-profile-widget" id="user-profile-widget">
+                <div class="user-avatar">🧑‍🌾</div>
+                <div class="user-info">
+                    <span class="user-name" id="user-display-name">Yükleniyor...</span>
+                    <span class="user-role">Çiftçi</span>
                 </div>
             </div>
 
@@ -59,6 +66,14 @@
                     </svg>
                     E-posta Raporu Gönder
                 </button>
+                <a href="#" class="nav-item" id="nav-logout" style="margin-top: 20px; color: var(--color-danger);">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Güvenli Çıkış</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -287,6 +302,66 @@
                     <button type="submit" class="btn btn-success">Ayarları Kaydet</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Auth Container (Login / Register) -->
+    <div class="auth-backdrop" id="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M2 22C2 16.5 6.5 12 12 12C17.5 12 22 16.5 22 22" stroke-linecap="round"/>
+                        <path d="M12 2V12" stroke-linecap="round"/>
+                        <path d="M12 2C8.5 5.5 6 9 6 12C6 14 7.5 15.5 9.5 15.5C11.5 15.5 12 14 12 12" stroke-linecap="round"/>
+                        <path d="M12 2C15.5 5.5 18 9 18 12C18 14 16.5 15.5 14.5 15.5C12.5 15.5 12 14 12 12" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h2>TarımTakip</h2>
+                <p>Çiftçi Portalı & İlaç Takip Sistemi</p>
+            </div>
+            
+            <!-- Login Form -->
+            <div class="auth-form-view" id="login-view">
+                <h3>Hesabınıza Giriş Yapın</h3>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">E-posta Adresi</label>
+                        <input type="email" id="login-email" required placeholder="ornek@mail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Parola</label>
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn btn-primary auth-submit-btn">Giriş Yap</button>
+                </form>
+                <div class="auth-switch">
+                    Henüz bir hesabınız yok mu? <a href="#" id="switch-to-register">Kayıt Olun</a>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div class="auth-form-view" id="register-view" style="display: none;">
+                <h3>Yeni Hesap Oluşturun</h3>
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="register-name">Adınız Soyadınız</label>
+                        <input type="text" id="register-name" required placeholder="Örn: Ahmet Yılmaz">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-email">E-posta Adresi</label>
+                        <input type="email" id="register-email" required placeholder="ornek@mail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Parola</label>
+                        <input type="password" id="register-password" required placeholder="En az 6 karakter">
+                    </div>
+                    <button type="submit" class="btn btn-success auth-submit-btn">Hesap Oluştur</button>
+                </form>
+                <div class="auth-switch">
+                    Zaten bir hesabınız var mı? <a href="#" id="switch-to-login">Giriş Yapın</a>
+                </div>
+            </div>
         </div>
     </div>
 

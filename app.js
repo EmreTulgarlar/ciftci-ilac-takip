@@ -1,17 +1,22 @@
-// TarımTakip - State Management and UI Logic
+// TarımTakip - Çoklu Kullanıcı Giriş & İlaç Takip Sistemi
 
 // State variables
 let sprays = [];
 let currentFilter = 'all';
 let searchQuery = '';
 
-// DOM Elements
+// DOM Layout Containers
+const appContainer = document.getElementById('app-container');
+const authContainer = document.getElementById('auth-container');
+
+// DOM Dashboard/List Elements
 const spraysGrid = document.getElementById('sprays-grid');
 const emptyState = document.getElementById('empty-state');
 const resultsCount = document.getElementById('results-count');
 const liveDateEl = document.getElementById('live-date');
+const userDisplayName = document.getElementById('user-display-name');
 
-// Modal Elements
+// Modal Elements (Spray Log)
 const sprayModal = document.getElementById('spray-modal');
 const sprayForm = document.getElementById('spray-form');
 const modalTitle = document.getElementById('modal-title');
@@ -19,6 +24,18 @@ const openModalBtn = document.getElementById('open-modal-btn');
 const emptyStateBtn = document.getElementById('empty-state-btn');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const cancelModalBtn = document.getElementById('cancel-modal-btn');
+
+// Form Input Elements (Spray Log)
+const inputId = document.getElementById('spray-id');
+const inputCrop = document.getElementById('input-crop');
+const inputPesticide = document.getElementById('input-pesticide');
+const inputDate = document.getElementById('input-date');
+const inputDuration = document.getElementById('input-duration');
+const inputPhi = document.getElementById('input-phi');
+const inputDosage = document.getElementById('input-dosage');
+const inputPest = document.getElementById('input-pest');
+const inputNotes = document.getElementById('input-notes');
+const saveBtn = document.getElementById('save-btn');
 
 // Settings Modal Elements
 const settingsModal = document.getElementById('settings-modal');
@@ -35,17 +52,14 @@ const inputSmtpUser = document.getElementById('input-smtp-user');
 const inputSmtpPass = document.getElementById('input-smtp-pass');
 const inputRecipientEmail = document.getElementById('input-recipient-email');
 
-// Form Input Elements
-const inputId = document.getElementById('spray-id');
-const inputCrop = document.getElementById('input-crop');
-const inputPesticide = document.getElementById('input-pesticide');
-const inputDate = document.getElementById('input-date');
-const inputDuration = document.getElementById('input-duration');
-const inputPhi = document.getElementById('input-phi');
-const inputDosage = document.getElementById('input-dosage');
-const inputPest = document.getElementById('input-pest');
-const inputNotes = document.getElementById('input-notes');
-const saveBtn = document.getElementById('save-btn');
+// Authentication DOM Elements
+const loginView = document.getElementById('login-view');
+const registerView = document.getElementById('register-view');
+const loginForm = document.getElementById('login-form');
+const registerForm = document.getElementById('register-form');
+const switchToRegister = document.getElementById('switch-to-register');
+const switchToLogin = document.getElementById('switch-to-login');
+const navLogout = document.getElementById('nav-logout');
 
 // Search and Filter Elements
 const searchInput = document.getElementById('search-input');
@@ -57,48 +71,25 @@ const statHarvestWaiting = document.getElementById('stat-harvest-waiting');
 const statHarvestSafe = document.getElementById('stat-harvest-safe');
 const statTotalSprays = document.getElementById('stat-total-sprays');
 
-// Initial Mock Data
+// Initial Mock Data (Fallback when offline/not registered)
 const mockSprays = [
     {
         id: 'mock-1',
         crop: 'Elma (Amasya)',
         pesticide: 'Kırmızı Örümcek İlacı (Acaricide)',
-        date: getPastDateString(2), // 2 days ago
+        date: getPastDateString(2),
         duration: 14,
         phi: 7,
         dosage: '100 ml / 100 Lt Su',
-        pest: 'Kırmızı Örümcek (Tetranychus urticae)',
-        notes: 'Sabah erken saatlerde, rüzgarsız havada uygulandı. Maske ve eldiven kullanıldı.'
-    },
-    {
-        id: 'mock-2',
-        crop: 'Domates (Sera)',
-        pesticide: 'Bakır Sülfat (Göztaşı)',
-        date: getPastDateString(10), // 10 days ago
-        duration: 10,
-        phi: 3,
-        dosage: '150 g / 100 Lt Su',
-        pest: 'Mildiyö Hastalığı (Phytophthora infestans)',
-        notes: 'Yağmur yağışından önce uygulandı. Yaprak altlarının ıslanmasına özen gösterildi.'
-    },
-    {
-        id: 'mock-3',
-        crop: 'Şeftali',
-        pesticide: 'Fungusit (Monilya Koruyucu)',
-        date: getPastDateString(4), // 4 days ago
-        duration: 12,
-        phi: 3,
-        dosage: '80 ml / 100 Lt Su',
-        pest: 'Monilya Hastalığı (Sert çekirdeklilerde)',
-        notes: 'Çiçeklenme sonrasında uygulandı. Arıların aktif olmadığı saatler seçildi.'
+        pest: 'Kırmızı Örümcek',
+        notes: 'Giriş yaptıktan sonra kendi ilaçlarınızı kaydedip takip edebilirsiniz.'
     }
 ];
 
-// Helper to get past dates ISO format for datetime-local value
+// Helper to get past dates ISO format
 function getPastDateString(daysAgo) {
     const d = new Date();
     d.setDate(d.getDate() - daysAgo);
-    // Format to yyyy-MM-ddThh:mm
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -107,28 +98,65 @@ function getPastDateString(daysAgo) {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+// Fetch API Auth Wrapper
+async function apiCall(url, method = 'GET', body = null) {
+    const token = localStorage.getItem('tarim_takip_token');
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const options = { method, headers };
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    const res = await fetch(url, options);
+    
+    if (res.status === 401) {
+        handleLogoutAction();
+        throw new Error('Oturum süresi doldu. Lütfen tekrar giriş yapın.');
+    }
+    
+    return res;
+}
+
 // App Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    initApp();
+    checkAuthState();
     setupEventListeners();
     updateLiveClock();
-    setInterval(updateLiveClock, 60000); // Update every minute
+    setInterval(updateLiveClock, 60000);
 });
+
+// Check Auth token in localStorage
+function checkAuthState() {
+    const token = localStorage.getItem('tarim_takip_token');
+    const userStr = localStorage.getItem('tarim_takip_user');
+    
+    if (token && userStr) {
+        const user = JSON.parse(userStr);
+        userDisplayName.textContent = user.name;
+        
+        authContainer.style.display = 'none';
+        appContainer.style.display = 'grid';
+        initApp();
+    } else {
+        appContainer.style.display = 'none';
+        authContainer.style.display = 'flex';
+    }
+}
 
 async function initApp() {
     try {
-        const res = await fetch('/api/sprays');
+        const res = await apiCall('/api/sprays');
         sprays = await res.json();
         renderUI();
     } catch (e) {
-        showToast('Veriler sunucudan alınamadı. Çevrimdışı modda yerel veri kullanılabilir.', 'error');
-        const stored = localStorage.getItem('tarim_takip_sprays');
-        if (stored) {
-            sprays = JSON.parse(stored);
-        } else {
-            sprays = [...mockSprays];
-        }
-        renderUI();
+        console.error(e);
+        showToast('Veriler sunucudan alınamadı.', 'error');
     }
 }
 
@@ -172,11 +200,9 @@ function calculateSprayMetrics(spray) {
     const protectionRemainingMs = protectionEndTime - now;
     const harvestRemainingMs = harvestSafetyEndTime - now;
     
-    // Remaining days rounding up
     const protectionDaysLeft = Math.max(0, Math.ceil(protectionRemainingMs / (24 * 60 * 60 * 1000)));
     const harvestDaysLeft = Math.max(0, Math.ceil(harvestRemainingMs / (24 * 60 * 60 * 1000)));
     
-    // Progress bar percentages
     const elapsedProtection = now - sprayTime;
     const protectionPercent = Math.max(0, Math.min(100, (1 - elapsedProtection / durationMs) * 100));
     
@@ -186,9 +212,6 @@ function calculateSprayMetrics(spray) {
         harvestPercent = Math.max(0, Math.min(100, (elapsedHarvest / phiMs) * 100));
     }
 
-    // Determine status
-    // Active Protection: protectionDaysLeft > 0
-    // Harvest Forbidden: harvestDaysLeft > 0
     let status = 'expired';
     let statusText = 'Etki Süresi Doldu';
     
@@ -202,7 +225,7 @@ function calculateSprayMetrics(spray) {
         status = 'harvest-safe';
         statusText = 'Etki Bitti & Güvenli Hasat';
     } else if (protectionDaysLeft <= 0 && harvestDaysLeft > 0) {
-        status = 'harvest-warning'; // uncommon, but safe to show warning since phi is active
+        status = 'harvest-warning';
         statusText = 'Etki Bitti & Hasat Yasağı';
     }
 
@@ -223,7 +246,6 @@ function calculateSprayMetrics(spray) {
 function renderUI() {
     let filtered = [...sprays];
 
-    // Calculate metrics and assign status temporarily
     filtered = filtered.map(spray => {
         const metrics = calculateSprayMetrics(spray);
         return { ...spray, metrics };
@@ -250,16 +272,11 @@ function renderUI() {
         filtered = filtered.filter(item => item.metrics.protectionDaysLeft === 0);
     }
 
-    // Sort by date descending (most recent first)
     filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Update Stats counters
     updateStats();
 
-    // Update count indicator
     resultsCount.textContent = `${filtered.length} kayıt listeleniyor`;
-
-    // Render Grid
     spraysGrid.innerHTML = '';
     
     if (filtered.length === 0) {
@@ -306,7 +323,6 @@ function createSprayCardElement(item) {
     card.className = 'spray-card';
     card.setAttribute('data-id', item.id);
 
-    // Dynamic styling check
     let badgeClass = 'status-expired';
     if (metrics.status === 'active-protection') badgeClass = 'status-active-protection';
     if (metrics.status === 'harvest-warning') badgeClass = 'status-harvest-warning';
@@ -334,7 +350,6 @@ function createSprayCardElement(item) {
         </div>
 
         <div class="progress-section">
-            <!-- Protection Time Progress -->
             <div class="progress-group">
                 <div class="progress-header">
                     <span>Pestisit Koruma Süresi</span>
@@ -349,7 +364,6 @@ function createSprayCardElement(item) {
                 </div>
             </div>
 
-            <!-- Harvest Wait Progress -->
             <div class="progress-group">
                 <div class="progress-header">
                     <span>Hasat Güvenlik Aralığı (PHI)</span>
@@ -385,7 +399,6 @@ function createSprayCardElement(item) {
         </div>
     `;
 
-    // Event listeners inside cards
     card.querySelector('.delete-btn').addEventListener('click', () => {
         deleteSpray(item.id);
     });
@@ -397,7 +410,6 @@ function createSprayCardElement(item) {
     return card;
 }
 
-// Security Escaping helper
 function escapeHtml(unsafe) {
     return unsafe
         .replace(/&/g, "&amp;")
@@ -411,7 +423,7 @@ function escapeHtml(unsafe) {
 async function deleteSpray(id) {
     if (confirm('Bu ilaçlama kaydını silmek istediğinizden emin misiniz?')) {
         try {
-            await fetch(`/api/sprays/${id}`, { method: 'DELETE' });
+            await apiCall(`/api/sprays/${id}`, 'DELETE');
             sprays = sprays.filter(item => item.id !== id);
             renderUI();
             showToast('İlaçlama kaydı başarıyla silindi.', 'success');
@@ -426,12 +438,10 @@ function openAddModal() {
     modalTitle.textContent = 'Yeni İlaçlama Kaydı';
     saveBtn.textContent = 'Kaydet ve Takibe Başla';
     
-    // Set default date to local current date-time
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     inputDate.value = now.toISOString().slice(0, 16);
     
-    // Reset other fields
     inputId.value = '';
     inputCrop.value = '';
     inputPesticide.value = '';
@@ -448,7 +458,6 @@ function openEditModal(item) {
     modalTitle.textContent = 'İlaçlama Kaydını Düzenle';
     saveBtn.textContent = 'Değişiklikleri Kaydet';
     
-    // Fill the inputs
     inputId.value = item.id;
     inputCrop.value = item.crop;
     inputPesticide.value = item.pesticide;
@@ -474,7 +483,6 @@ function setupEventListeners() {
     closeModalBtn.addEventListener('click', closeModal);
     cancelModalBtn.addEventListener('click', closeModal);
     
-    // Close modal on outside click
     sprayModal.addEventListener('click', (e) => {
         if (e.target === sprayModal) closeModal();
     });
@@ -501,7 +509,7 @@ function setupEventListeners() {
         renderUI();
     });
 
-    // Send report listener
+    // Send report listener (mailto)
     const sendReportBtn = document.getElementById('send-report-btn');
     if (sendReportBtn) {
         sendReportBtn.addEventListener('click', sendEmailReport);
@@ -512,16 +520,123 @@ function setupEventListeners() {
     if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettingsModal);
     if (cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', closeSettingsModal);
     
-    // Close settings modal on outside click
     if (settingsModal) {
         settingsModal.addEventListener('click', (e) => {
             if (e.target === settingsModal) closeSettingsModal();
         });
     }
     
-    // Settings form save and test
     if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
     if (testEmailBtn) testEmailBtn.addEventListener('click', testSmtpConnection);
+
+    // Authentication Views switching
+    switchToRegister.addEventListener('click', (e) => {
+        e.preventDefault();
+        loginView.style.display = 'none';
+        registerView.style.display = 'block';
+    });
+
+    switchToLogin.addEventListener('click', (e) => {
+        e.preventDefault();
+        registerView.style.display = 'none';
+        loginView.style.display = 'block';
+    });
+
+    // Login Form Submit
+    loginForm.addEventListener('submit', handleLogin);
+    
+    // Register Form Submit
+    registerForm.addEventListener('submit', handleRegister);
+
+    // Logout click listener
+    navLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleLogout();
+    });
+}
+
+// User Authentication handler functions
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    try {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+            localStorage.setItem('tarim_takip_token', result.token);
+            localStorage.setItem('tarim_takip_user', JSON.stringify(result.user));
+            
+            showToast('Başarıyla giriş yapıldı. Hoş geldiniz!', 'success');
+            loginForm.reset();
+            checkAuthState();
+        } else {
+            showToast(result.message, 'error');
+        }
+    } catch (err) {
+        showToast('Bağlantı hatası. Giriş yapılamadı.', 'error');
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById('register-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+
+    if (password.length < 6) {
+        showToast('Şifre en az 6 karakter olmalıdır.', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password })
+        });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+            showToast('Hesabınız oluşturuldu! Şimdi giriş yapabilirsiniz.', 'success');
+            registerForm.reset();
+            // Automatically switch back to login
+            registerView.style.display = 'none';
+            loginView.style.display = 'block';
+        } else {
+            showToast(result.message, 'error');
+        }
+    } catch (err) {
+        showToast('Bağlantı hatası. Kayıt yapılamadı.', 'error');
+    }
+}
+
+async function handleLogout() {
+    if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
+        try {
+            await apiCall('/api/auth/logout', 'POST');
+        } catch (e) {
+            // Ignore token expiration errors during logout
+        }
+        handleLogoutAction();
+    }
+}
+
+function handleLogoutAction() {
+    localStorage.removeItem('tarim_takip_token');
+    localStorage.removeItem('tarim_takip_user');
+    
+    sprays = [];
+    spraysGrid.innerHTML = '';
+    
+    showToast('Oturum sonlandırıldı.', 'success');
+    checkAuthState();
 }
 
 async function saveForm() {
@@ -541,11 +656,7 @@ async function saveForm() {
     try {
         if (id) {
             // Edit Mode
-            await fetch(`/api/sprays/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sprayData)
-            });
+            await apiCall(`/api/sprays/${id}`, 'PUT', sprayData);
             const index = sprays.findIndex(item => item.id === id);
             if (index !== -1) {
                 sprays[index] = sprayData;
@@ -553,11 +664,7 @@ async function saveForm() {
             }
         } else {
             // Create Mode
-            await fetch('/api/sprays', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sprayData)
-            });
+            await apiCall('/api/sprays', 'POST', sprayData);
             sprays.push(sprayData);
             showToast('Yeni ilaçlama kaydı oluşturuldu.', 'success');
         }
@@ -570,7 +677,7 @@ async function saveForm() {
 
 async function openSettingsModal() {
     try {
-        const res = await fetch('/api/settings');
+        const res = await apiCall('/api/settings');
         const config = await res.json();
         
         inputSmtpServer.value = config.smtp_server || '';
@@ -600,11 +707,7 @@ async function saveSettings(e) {
     };
     
     try {
-        const res = await fetch('/api/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
-        });
+        const res = await apiCall('/api/settings', 'POST', config);
         const result = await res.json();
         if (result.status === 'success') {
             showToast('Sistem ayarları kaydedildi.', 'success');
@@ -613,7 +716,7 @@ async function saveSettings(e) {
             showToast('Ayarlar kaydedilemedi.', 'error');
         }
     } catch (e) {
-        showToast('Ağ hatası. Ayarlar kaydedilemedi.', 'error');
+        showToast('Ayarlar kaydedilemedi.', 'error');
     }
 }
 
@@ -628,11 +731,7 @@ async function testSmtpConnection() {
     
     showToast('Bağlantı test ediliyor, lütfen bekleyin...', 'info');
     try {
-        const res = await fetch('/api/test-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
-        });
+        const res = await apiCall('/api/test-email', 'POST', config);
         const result = await res.json();
         if (result.status === 'success') {
             showToast('Test maili başarıyla gönderildi!', 'success');
@@ -640,7 +739,7 @@ async function testSmtpConnection() {
             showToast('Bağlantı başarısız: ' + result.message, 'error');
         }
     } catch (e) {
-        showToast('Bağlantı test edilemedi (Sunucu hatası).', 'error');
+        showToast('Bağlantı test edilemedi.', 'error');
     }
 }
 
@@ -655,7 +754,6 @@ function sendEmailReport() {
     emailBody += `Tarih: ${todayStr}\n`;
     emailBody += `=========================================\n\n`;
 
-    // Categorize
     let harvestWarningText = '';
     let activeProtectionText = '';
     let expiredText = '';
