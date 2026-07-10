@@ -16,6 +16,13 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 
 DB_FILE = 'tarim_takip.db'
 
+# Designated admin email addresses
+ADMIN_EMAILS = [
+    'admin@tarimtakip.com',
+    'admin@example.com',
+    'emretulgarlar@gmail.com'
+]
+
 # Initialize SQLite database with multi-user tables
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -113,6 +120,18 @@ def get_user_from_request():
         return row['user_id']
     return None
 
+# Admin check helper
+def is_admin_user(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT email FROM users WHERE id = ?', (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if row and row['email'] in ADMIN_EMAILS:
+        return True
+    return False
+
 # Email sending utility
 def send_email(subject, body, config):
     if not config.get('smtp_username') or not config.get('recipient_email'):
@@ -142,7 +161,6 @@ def check_sprays_loop():
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
             
-            # Query sprays along with their user settings
             c.execute('''
                 SELECT s.*, us.smtp_server, us.smtp_port, us.smtp_username, us.smtp_password, us.recipient_email
                 FROM sprays s
@@ -154,7 +172,6 @@ def check_sprays_loop():
             updated = False
             
             for row in rows:
-                # If email configuration is missing, skip
                 if not row['smtp_username'] or not row['recipient_email']:
                     continue
                     
@@ -218,7 +235,7 @@ def check_sprays_loop():
         except Exception as e:
             print(f"Background check error: {e}")
             
-        time.sleep(300) # Check every 5 minutes
+        time.sleep(300)
 
 # API Routes
 @app.route('/')
@@ -239,7 +256,6 @@ def register():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    # Check if email is already taken
     c.execute('SELECT id FROM users WHERE email = ?', (email,))
     if c.fetchone():
         conn.close()
@@ -254,7 +270,6 @@ def register():
             VALUES (?, ?, ?, ?, ?)
         ''', (user_id, email, password_hash, salt, name))
         
-        # Initialize default settings for user
         c.execute('''
             INSERT INTO user_settings (user_id, smtp_server, smtp_port, smtp_username, smtp_password, recipient_email)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -304,7 +319,8 @@ def login():
         "user": {
             "id": user['id'],
             "email": user['email'],
-            "name": user['name']
+            "name": user['name'],
+            "is_admin": user['email'] in ADMIN_EMAILS
         }
     })
 
@@ -339,7 +355,8 @@ def get_me():
             "user": {
                 "id": user_id,
                 "email": user['email'],
-                "name": user['name']
+                "name": user['name'],
+                "is_admin": user['email'] in ADMIN_EMAILS
             }
         })
     return jsonify({"status": "error", "message": "Kullanıcı bulunamadı."}), 404
@@ -489,7 +506,6 @@ def get_settings():
             "recipient_email": row['recipient_email'] or ''
         }
         
-    # Mask password for security
     masked_config = config.copy()
     if masked_config['smtp_password']:
         masked_config['smtp_password'] = '••••••••••••'
@@ -553,6 +569,65 @@ def test_email():
         return jsonify({"status": "success", "message": "Test maili başarıyla gönderildi!"})
     else:
         return jsonify({"status": "error", "message": "Test maili gönderilemedi. Lütfen bilgilerinizi kontrol edin."})
+
+# Admin Dashboard API Routes
+@app.route('/api/admin/users', methods=['GET'])
+def admin_get_users():
+    user_id = get_user_from_request()
+    if not user_id or not is_admin_user(user_id):
+        return jsonify({"status": "error", "message": "Yetkisiz erişim. Sadece sistem yöneticileri bu sayfayı görebilir."}), 403
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    # Query users and counts of their sprays
+    c.execute('''
+        SELECT u.id, u.email, u.name, COUNT(s.id) as spray_count
+        FROM users u
+        LEFT JOIN sprays s ON u.id = s.user_id
+        GROUP BY u.id
+    ''')
+    rows = c.fetchall()
+    conn.close()
+    
+    users_list = []
+    for r in rows:
+        users_list.append({
+            'id': r['id'],
+            'name': r['name'],
+            'email': r['email'],
+            'spray_count': r['spray_count']
+        })
+    return jsonify(users_list)
+
+@app.route('/api/admin/users/<target_user_id>/sprays', methods=['GET'])
+def admin_get_user_sprays(target_user_id):
+    user_id = get_user_from_request()
+    if not user_id or not is_admin_user(user_id):
+        return jsonify({"status": "error", "message": "Yetkisiz erişim. Sadece sistem yöneticileri bu sayfayı görebilir."}), 403
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM sprays WHERE user_id = ?', (target_user_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    sprays_list = []
+    for r in rows:
+        sprays_list.append({
+            'id': r['id'],
+            'crop': r['crop'],
+            'pesticide': r['pesticide'],
+            'date': r['date'],
+            'duration': r['duration'],
+            'phi': r['phi'],
+            'dosage': r['dosage'],
+            'pest': r['pest'],
+            'notes': r['notes']
+        })
+    return jsonify(sprays_list)
 
 if __name__ == '__main__':
     init_db()

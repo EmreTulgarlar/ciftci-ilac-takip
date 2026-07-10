@@ -1076,3 +1076,48 @@ body {
     background-color: rgba(255, 82, 82, 0.08) !important;
 }
 
+/* Admin Panel Table Styles */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+}
+
+.admin-table th, .admin-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.admin-table th {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--color-primary);
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.admin-table tbody tr {
+    transition: var(--transition-smooth);
+}
+
+.admin-table tbody tr:hover {
+    background: rgba(0, 230, 118, 0.03);
+}
+
+.admin-table td {
+    color: var(--color-text-secondary);
+}
+
+.admin-table td strong {
+    color: var(--color-text-primary);
+}
+
+.admin-table-wrapper {
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.01);
+    overflow: hidden;
+}
+
+

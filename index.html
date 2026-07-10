@@ -52,6 +52,15 @@
                     </svg>
                     <span>Sistem Ayarları</span>
                 </a>
+                <a href="#" class="nav-item" id="nav-admin" style="display: none;">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Yönetici Paneli</span>
+                </a>
                 <button class="btn btn-primary add-spray-btn" id="open-modal-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -104,6 +113,7 @@
                 </div>
             </header>
 
+            <div id="view-dashboard">
             <!-- Dashboard Stats Grid -->
             <section class="stats-grid">
                 <div class="stat-card active-protection">
@@ -200,6 +210,32 @@
                     </div>
                 </div>
             </section>
+            </div>
+
+            <!-- Admin Panel View -->
+            <div id="view-admin" style="display: none;">
+                <section class="sprays-container" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 2rem; border-radius: 16px;">
+                    <div class="section-title-row">
+                        <h3>Sistemdeki Kayıtlı Çiftçiler / Kullanıcılar</h3>
+                        <span class="results-count" id="admin-users-count">0 kayıt</span>
+                    </div>
+                    <div class="admin-table-wrapper" style="overflow-x: auto; margin-top: 1.5rem;">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Çiftçi Adı Soyadı</th>
+                                    <th>E-posta Adresi</th>
+                                    <th>Kayıtlı İlaçlama Sayısı</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-tbody">
+                                <!-- Users rows will be injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
@@ -360,6 +396,26 @@
                 </form>
                 <div class="auth-switch">
                     Zaten bir hesabınız var mı? <a href="#" id="switch-to-login">Giriş Yapın</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin User Sprays View Modal -->
+    <div class="modal-backdrop" id="admin-sprays-modal">
+        <div class="modal-card" style="max-width: 850px; width: 90%;">
+            <div class="modal-header">
+                <h3 id="admin-sprays-modal-title">Çiftçi İlaçlama Kayıtları</h3>
+                <button class="close-btn" id="close-admin-sprays-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 2rem; max-height: 70vh; overflow-y: auto;">
+                <div class="sprays-grid" id="admin-user-sprays-grid">
+                    <!-- Target user sprays cards injected here -->
                 </div>
             </div>
         </div>

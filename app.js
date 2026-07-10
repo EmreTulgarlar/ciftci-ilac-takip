@@ -8,6 +8,8 @@ let searchQuery = '';
 // DOM Layout Containers
 const appContainer = document.getElementById('app-container');
 const authContainer = document.getElementById('auth-container');
+const viewDashboard = document.getElementById('view-dashboard');
+const viewAdmin = document.getElementById('view-admin');
 
 // DOM Dashboard/List Elements
 const spraysGrid = document.getElementById('sprays-grid');
@@ -60,6 +62,15 @@ const registerForm = document.getElementById('register-form');
 const switchToRegister = document.getElementById('switch-to-register');
 const switchToLogin = document.getElementById('switch-to-login');
 const navLogout = document.getElementById('nav-logout');
+
+// Admin Panel DOM Elements
+const navAdmin = document.getElementById('nav-admin');
+const adminUsersCount = document.getElementById('admin-users-count');
+const adminUsersTbody = document.getElementById('admin-users-tbody');
+const adminSpraysModal = document.getElementById('admin-sprays-modal');
+const adminUserSpraysGrid = document.getElementById('admin-user-sprays-grid');
+const closeAdminSpraysBtn = document.getElementById('close-admin-sprays-btn');
+const adminSpraysModalTitle = document.getElementById('admin-sprays-modal-title');
 
 // Search and Filter Elements
 const searchInput = document.getElementById('search-input');
@@ -140,9 +151,16 @@ function checkAuthState() {
         const user = JSON.parse(userStr);
         userDisplayName.textContent = user.name;
         
+        // Show Admin Nav Link if user is admin
+        if (user.is_admin) {
+            navAdmin.style.display = 'flex';
+        } else {
+            navAdmin.style.display = 'none';
+        }
+        
         authContainer.style.display = 'none';
         appContainer.style.display = 'grid';
-        initApp();
+        switchView('dashboard'); // Always land on dashboard view on login/refresh
     } else {
         appContainer.style.display = 'none';
         authContainer.style.display = 'flex';
@@ -157,6 +175,152 @@ async function initApp() {
     } catch (e) {
         console.error(e);
         showToast('Veriler sunucudan alınamadı.', 'error');
+    }
+}
+
+// Switch between dashboard and admin panel views
+function switchView(viewName) {
+    // Remove active style from sidebar links
+    document.getElementById('nav-dashboard').classList.remove('active');
+    navAdmin.classList.remove('active');
+    
+    if (viewName === 'dashboard') {
+        document.getElementById('nav-dashboard').classList.add('active');
+        viewDashboard.style.display = 'block';
+        viewAdmin.style.display = 'none';
+        initApp();
+    } else if (viewName === 'admin') {
+        navAdmin.classList.add('active');
+        viewDashboard.style.display = 'none';
+        viewAdmin.style.display = 'block';
+        loadAdminPanel();
+    }
+}
+
+// Load registered users details for admin view
+async function loadAdminPanel() {
+    try {
+        const res = await apiCall('/api/admin/users');
+        const users = await res.json();
+        
+        adminUsersCount.textContent = `${users.length} kayıtlı çiftçi`;
+        adminUsersTbody.innerHTML = '';
+        
+        if (users.length === 0) {
+            adminUsersTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">Sistemde henüz kayıtlı kullanıcı bulunmuyor.</td></tr>`;
+            return;
+        }
+        
+        users.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${escapeHtml(u.name)}</strong></td>
+                <td>${escapeHtml(u.email)}</td>
+                <td><span class="crop-badge">${u.spray_count} İlaçlama</span></td>
+                <td>
+                    <button class="btn btn-secondary btn-icon view-user-sprays-btn" data-id="${u.id}" data-name="${escapeHtml(u.name)}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        İlaçlamaları Gör
+                    </button>
+                </td>
+            `;
+            
+            tr.querySelector('.view-user-sprays-btn').addEventListener('click', () => {
+                openAdminUserSpraysModal(u.id, u.name);
+            });
+            
+            adminUsersTbody.appendChild(tr);
+        });
+    } catch (e) {
+        showToast('Kullanıcı listesi yüklenemedi.', 'error');
+    }
+}
+
+// Open modal to view selected user sprays
+async function openAdminUserSpraysModal(targetUserId, targetUserName) {
+    try {
+        adminSpraysModalTitle.textContent = `${targetUserName} - İlaçlama Kayıtları`;
+        adminUserSpraysGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary); padding: 2rem;">Yükleniyor...</div>';
+        adminSpraysModal.classList.add('open');
+        
+        const res = await apiCall(`/api/admin/users/${targetUserId}/sprays`);
+        const userSprays = await res.json();
+        
+        adminUserSpraysGrid.innerHTML = '';
+        
+        if (userSprays.length === 0) {
+            adminUserSpraysGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--color-text-muted); padding: 3rem;">Çiftçiye ait kayıtlı ilaçlama bulunmuyor.</div>';
+            return;
+        }
+        
+        userSprays.forEach(item => {
+            const metrics = calculateSprayMetrics(item);
+            
+            let badgeClass = 'status-expired';
+            if (metrics.status === 'active-protection') badgeClass = 'status-active-protection';
+            if (metrics.status === 'harvest-warning') badgeClass = 'status-harvest-warning';
+            if (metrics.status === 'harvest-safe') badgeClass = 'status-harvest-safe';
+            
+            const card = document.createElement('div');
+            card.className = 'spray-card';
+            card.innerHTML = `
+                <div class="card-header-row">
+                    <span class="crop-badge">${escapeHtml(item.crop)}</span>
+                    <span class="status-badge ${badgeClass}">${metrics.statusText}</span>
+                </div>
+                <div>
+                    <h4 class="pesticide-title">${escapeHtml(item.pesticide)}</h4>
+                    <div class="card-notes">${item.pest ? `Hedef: ${escapeHtml(item.pest)}` : 'Hedef: Genel Koruma'}</div>
+                </div>
+                
+                <div class="spray-details">
+                    <div class="detail-item">
+                        <span class="label">Uygulama Zamanı</span>
+                        <span class="val">${metrics.sprayDateFormatted}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Dozaj</span>
+                        <span class="val">${item.dosage ? escapeHtml(item.dosage) : 'Belirtilmedi'}</span>
+                    </div>
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-group">
+                        <div class="progress-header">
+                            <span>Pestisit Koruma Süresi</span>
+                            <span>${metrics.protectionDaysLeft > 0 ? `${metrics.protectionDaysLeft} Gün Kaldı` : 'Süre Doldu'}</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar ${metrics.protectionDaysLeft > 0 ? 'pb-protection' : 'pb-expired'}" style="width: ${metrics.protectionPercent}%"></div>
+                        </div>
+                        <div class="progress-header" style="font-size: 0.65rem; color: var(--color-text-muted);">
+                            <span>Uygulama: ${new Date(item.date).toLocaleDateString('tr-TR')}</span>
+                            <span>Bitiş: ${metrics.protectionEndDateStr}</span>
+                        </div>
+                    </div>
+                    <div class="progress-group">
+                        <div class="progress-header">
+                            <span>Hasat Güvenlik Aralığı (PHI)</span>
+                            <span>${metrics.harvestDaysLeft > 0 ? `${metrics.harvestDaysLeft} Gün Yasak` : 'Hasat Güvenli'}</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar ${metrics.harvestDaysLeft > 0 ? 'pb-harvest' : 'pb-protection'}" style="width: ${metrics.harvestPercent}%"></div>
+                        </div>
+                        <div class="progress-header" style="font-size: 0.65rem; color: var(--color-text-muted);">
+                            <span>Gerekli Süre: ${item.phi} Gün</span>
+                            <span>Güvenli Tarih: ${metrics.harvestEndDateStr}</span>
+                        </div>
+                    </div>
+                </div>
+                ${item.notes ? `<p class="card-notes" title="${escapeHtml(item.notes)}"><strong>Not:</strong> ${escapeHtml(item.notes)}</p>` : ''}
+            `;
+            adminUserSpraysGrid.appendChild(card);
+        });
+    } catch (e) {
+        showToast('Çiftçi ilaç kayıtları alınamadı.', 'error');
     }
 }
 
@@ -529,6 +693,33 @@ function setupEventListeners() {
     if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
     if (testEmailBtn) testEmailBtn.addEventListener('click', testSmtpConnection);
 
+    // Switch sidebar links between Dashboard and Admin View
+    document.getElementById('nav-dashboard').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchView('dashboard');
+    });
+
+    if (navAdmin) {
+        navAdmin.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView('admin');
+        });
+    }
+
+    // Close admin sprays detail modal
+    if (closeAdminSpraysBtn) {
+        closeAdminSpraysBtn.addEventListener('click', () => {
+            adminSpraysModal.classList.remove('open');
+        });
+    }
+    if (adminSpraysModal) {
+        adminSpraysModal.addEventListener('click', (e) => {
+            if (e.target === adminSpraysModal) {
+                adminSpraysModal.classList.remove('open');
+            }
+        });
+    }
+
     // Authentication Views switching
     switchToRegister.addEventListener('click', (e) => {
         e.preventDefault();
@@ -606,7 +797,6 @@ async function handleRegister(e) {
         if (result.status === 'success') {
             showToast('Hesabınız oluşturuldu! Şimdi giriş yapabilirsiniz.', 'success');
             registerForm.reset();
-            // Automatically switch back to login
             registerView.style.display = 'none';
             loginView.style.display = 'block';
         } else {
@@ -622,7 +812,7 @@ async function handleLogout() {
         try {
             await apiCall('/api/auth/logout', 'POST');
         } catch (e) {
-            // Ignore token expiration errors during logout
+            // Ignore
         }
         handleLogoutAction();
     }
