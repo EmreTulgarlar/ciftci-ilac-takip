@@ -17,6 +17,7 @@ const emptyState = document.getElementById('empty-state');
 const resultsCount = document.getElementById('results-count');
 const liveDateEl = document.getElementById('live-date');
 const userDisplayName = document.getElementById('user-display-name');
+const userDisplayFarm = document.getElementById('user-display-farm');
 
 // Modal Elements (Spray Log)
 const sprayModal = document.getElementById('spray-modal');
@@ -151,6 +152,10 @@ function checkAuthState() {
         const user = JSON.parse(userStr);
         userDisplayName.textContent = user.name;
         
+        if (userDisplayFarm) {
+            userDisplayFarm.textContent = `${user.farm_type || 'Belirtilmedi'} Çiftçisi`;
+        }
+        
         // Show Admin Nav Link if user is admin
         if (user.is_admin) {
             navAdmin.style.display = 'flex';
@@ -207,7 +212,7 @@ async function loadAdminPanel() {
         adminUsersTbody.innerHTML = '';
         
         if (users.length === 0) {
-            adminUsersTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">Sistemde henüz kayıtlı kullanıcı bulunmuyor.</td></tr>`;
+            adminUsersTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">Sistemde henüz kayıtlı kullanıcı bulunmuyor.</td></tr>`;
             return;
         }
         
@@ -216,6 +221,7 @@ async function loadAdminPanel() {
             tr.innerHTML = `
                 <td><strong>${escapeHtml(u.name)}</strong></td>
                 <td>${escapeHtml(u.email)}</td>
+                <td><span class="crop-badge" style="background: rgba(0, 230, 118, 0.08); color: var(--color-primary);">${escapeHtml(u.farm_type)}</span></td>
                 <td><span class="crop-badge">${u.spray_count} İlaçlama</span></td>
                 <td>
                     <button class="btn btn-secondary btn-icon view-user-sprays-btn" data-id="${u.id}" data-name="${escapeHtml(u.name)}">
@@ -780,6 +786,7 @@ async function handleRegister(e) {
     const name = document.getElementById('register-name').value.trim();
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
+    const farm_type = document.getElementById('register-farm-type').value;
 
     if (password.length < 6) {
         showToast('Şifre en az 6 karakter olmalıdır.', 'error');
@@ -790,7 +797,7 @@ async function handleRegister(e) {
         const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, password })
+            body: JSON.stringify({ name, email, password, farm_type })
         });
         const result = await res.json();
         

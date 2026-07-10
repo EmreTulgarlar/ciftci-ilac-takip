@@ -43,9 +43,17 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
-            name TEXT
+            name TEXT,
+            farm_type TEXT DEFAULT 'Belirtilmedi'
         )
     ''')
+    
+    # Migration check: Check if farm_type column exists in users table (for existing DBs)
+    c.execute("PRAGMA table_info(users)")
+    user_columns = [col[1] for col in c.fetchall()]
+    if 'farm_type' not in user_columns:
+        print("Migration: Adding farm_type column to users table...")
+        c.execute("ALTER TABLE users ADD COLUMN farm_type TEXT DEFAULT 'Belirtilmedi'")
     
     c.execute('''
         CREATE TABLE IF NOT EXISTS user_settings (
@@ -249,6 +257,7 @@ def register():
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
     name = data.get('name', '').strip()
+    farm_type = data.get('farm_type', 'Belirtilmedi').strip()
     
     if not email or not password or not name:
         return jsonify({"status": "error", "message": "Ad soyad, e-posta ve şifre alanları zorunludur."}), 400
@@ -266,9 +275,9 @@ def register():
     
     try:
         c.execute('''
-            INSERT INTO users (id, email, password_hash, salt, name)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user_id, email, password_hash, salt, name))
+            INSERT INTO users (id, email, password_hash, salt, name, farm_type)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, email, password_hash, salt, name, farm_type))
         
         c.execute('''
             INSERT INTO user_settings (user_id, smtp_server, smtp_port, smtp_username, smtp_password, recipient_email)
@@ -320,6 +329,7 @@ def login():
             "id": user['id'],
             "email": user['email'],
             "name": user['name'],
+            "farm_type": user['farm_type'],
             "is_admin": user['email'] in ADMIN_EMAILS
         }
     })
@@ -345,7 +355,7 @@ def get_me():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT email, name FROM users WHERE id = ?', (user_id,))
+    c.execute('SELECT email, name, farm_type FROM users WHERE id = ?', (user_id,))
     user = c.fetchone()
     conn.close()
     
@@ -356,6 +366,7 @@ def get_me():
                 "id": user_id,
                 "email": user['email'],
                 "name": user['name'],
+                "farm_type": user['farm_type'],
                 "is_admin": user['email'] in ADMIN_EMAILS
             }
         })
@@ -581,9 +592,9 @@ def admin_get_users():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
-    # Query users and counts of their sprays
+    # Query users including farm_type and counts of their sprays
     c.execute('''
-        SELECT u.id, u.email, u.name, COUNT(s.id) as spray_count
+        SELECT u.id, u.email, u.name, u.farm_type, COUNT(s.id) as spray_count
         FROM users u
         LEFT JOIN sprays s ON u.id = s.user_id
         GROUP BY u.id
@@ -597,6 +608,7 @@ def admin_get_users():
             'id': r['id'],
             'name': r['name'],
             'email': r['email'],
+            'farm_type': r['farm_type'] or 'Belirtilmedi',
             'spray_count': r['spray_count']
         })
     return jsonify(users_list)

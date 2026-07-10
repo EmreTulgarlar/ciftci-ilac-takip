@@ -31,7 +31,7 @@
                 <div class="user-avatar">🧑‍🌾</div>
                 <div class="user-info">
                     <span class="user-name" id="user-display-name">Yükleniyor...</span>
-                    <span class="user-role">Çiftçi</span>
+                    <span class="user-role" id="user-display-farm">Çiftçi</span>
                 </div>
             </div>
 
@@ -225,6 +225,7 @@
                                 <tr>
                                     <th>Çiftçi Adı Soyadı</th>
                                     <th>E-posta Adresi</th>
+                                    <th>Tarla/Bahçe Türü</th>
                                     <th>Kayıtlı İlaçlama Sayısı</th>
                                     <th>İşlemler</th>
                                 </tr>
@@ -391,6 +392,19 @@
                     <div class="form-group">
                         <label for="register-password">Parola</label>
                         <input type="password" id="register-password" required placeholder="En az 6 karakter">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-farm-type">Tarla/Bahçe Türü</label>
+                        <select id="register-farm-type" required>
+                            <option value="Hobi Bahçesi">Hobi Bahçesi</option>
+                            <option value="Zeytinlik">Zeytinlik</option>
+                            <option value="Bağ / Üzüm">Bağ / Üzüm</option>
+                            <option value="Narenciye Bahçesi">Narenciye Bahçesi (Portakal, Limon vb.)</option>
+                            <option value="Meyve Bahçesi">Meyve Bahçesi (Elma, Şeftali vb.)</option>
+                            <option value="Sebze Serası">Sebze Serası (Domates, Biber vb.)</option>
+                            <option value="Tarla Tarımı">Tarla Tarımı (Buğday, Mısır vb.)</option>
+                            <option value="Diğer / Belirtilmemiş">Diğer / Belirtilmemiş</option>
+                        </select>
                     </div>
                     <button type="submit" class="btn btn-success auth-submit-btn">Hesap Oluştur</button>
                 </form>
