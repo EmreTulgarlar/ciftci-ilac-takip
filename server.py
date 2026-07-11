@@ -118,6 +118,19 @@ def init_db():
         )
     ''')
     
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS other_expenses (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL,
+            notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -237,7 +250,7 @@ def check_sprays_loop():
                         f"• İlaçlama Tarihi: {row['date']}\n"
                         f"• Etki Süresi: {row['duration']} Gün\n"
                         f"• Koruması Bittiği Tarih: {protection_end_time.strftime('%d.%m.%Y %H:%M')}\n\n"
-                        f"Tarlanızda zararlı kontrolü yapmanız ve gerekirse tekrar ilaçlama planmamız önerilir.\n\n"
+                        f"Tarlanızda zararlı kontrolü yapmanız ve gerekirse tekrar ilaçlama planlamanız önerilir.\n\n"
                         f"Bereketli günler dileriz,\nTarımTakip Sistemi"
                     )
                     if send_email(subject, body, config):
@@ -779,7 +792,138 @@ def delete_irrigation(irr_id):
     conn.close()
     return jsonify({"status": "success", "message": "Sulama kaydı silindi."})
 
-# Monthly Expense rollups
+# Other Expenses (Harici Maliyetler) CRUD APIs
+@app.route('/api/other-expenses', methods=['GET'])
+def get_other_expenses():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM other_expenses WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    exp_list = []
+    for r in rows:
+        exp_list.append({
+            'id': r['id'],
+            'title': r['title'],
+            'category': r['category'],
+            'amount': r['amount'],
+            'date': r['date'],
+            'notes': r['notes']
+        })
+    return jsonify(exp_list)
+
+@app.route('/api/other-expenses', methods=['POST'])
+def add_other_expense():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO other_expenses (id, user_id, title, category, amount, date, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        data['id'],
+        user_id,
+        data['title'],
+        data['category'],
+        float(data['amount']),
+        data['date'],
+        data.get('notes', '')
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gider kaydı başarıyla oluşturuldu."})
+
+@app.route('/api/other-expenses/<exp_id>', methods=['PUT'])
+def update_other_expense(exp_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM other_expenses WHERE id = ? AND user_id = ?', (exp_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu kaydı düzenlemeye yetkiniz yok."}), 403
+        
+    c.execute('''
+        UPDATE other_expenses
+        SET title = ?, category = ?, amount = ?, date = ?, notes = ?
+        WHERE id = ? AND user_id = ?
+    ''', (
+        data['title'],
+        data['category'],
+        float(data['amount']),
+        data['date'],
+        data.get('notes', ''),
+        exp_id,
+        user_id
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gider kaydı güncellendi."})
+
+@app.route('/api/other-expenses/<exp_id>', methods=['DELETE'])
+def delete_other_expense(exp_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM other_expenses WHERE id = ? AND user_id = ?', (exp_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu kaydı silmeye yetkiniz yok."}), 403
+        
+    c.execute('DELETE FROM other_expenses WHERE id = ? AND user_id = ?', (exp_id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gider kaydı silindi."})
+
+# Raw expenses payload for frontend graphing (instant customizable filtering & grouping)
+@app.route('/api/expenses/raw', methods=['GET'])
+def get_raw_expenses():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    # Fetch sprays with cost
+    c.execute('SELECT date, pesticide_cost, pesticide FROM sprays WHERE user_id = ? AND pesticide_cost > 0', (user_id,))
+    sprays = [{"date": r["date"], "amount": r["pesticide_cost"], "type": "pesticide", "name": r["pesticide"]} for r in c.fetchall()]
+    
+    # Fetch irrigations with cost
+    c.execute('SELECT date, water_cost, water_amount FROM irrigations WHERE user_id = ? AND water_cost > 0', (user_id,))
+    irrigations = [{"date": r["date"], "amount": r["water_cost"], "type": "water", "name": f"{r['water_amount']} Ton Sulama"} for r in c.fetchall()]
+    
+    # Fetch other expenses
+    c.execute('SELECT date, amount, title, category FROM other_expenses WHERE user_id = ?', (user_id,))
+    other = [{"date": r["date"], "amount": r["amount"], "type": "other", "name": f"{r['title']} ({r['category']})"} for r in c.fetchall()]
+    conn.close()
+    
+    all_expenses = sprays + irrigations + other
+    return jsonify(all_expenses)
+
+# Monthly Expense rollups (legacy support)
 @app.route('/api/expenses/monthly', methods=['GET'])
 def get_monthly_expenses():
     user_id = get_user_from_request()
@@ -789,7 +933,6 @@ def get_monthly_expenses():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    # Fetch monthly pesticide costs
     c.execute('''
         SELECT substr(date, 1, 7) as month, SUM(pesticide_cost) as pesticide_total
         FROM sprays
@@ -798,7 +941,6 @@ def get_monthly_expenses():
     ''', (user_id,))
     sprays_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
     
-    # Fetch monthly irrigation costs
     c.execute('''
         SELECT substr(date, 1, 7) as month, SUM(water_cost) as water_total
         FROM irrigations
@@ -806,23 +948,32 @@ def get_monthly_expenses():
         GROUP BY month
     ''', (user_id,))
     irrigations_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
+    
+    c.execute('''
+        SELECT substr(date, 1, 7) as month, SUM(amount) as other_total
+        FROM other_expenses
+        WHERE user_id = ?
+        GROUP BY month
+    ''', (user_id,))
+    other_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
     conn.close()
     
     # Merge months
-    all_months = sorted(list(set(list(sprays_cost.keys()) + list(irrigations_cost.keys()))))
-    # Keep only last 6 months for chart readability
-    if len(all_months) > 6:
-        all_months = all_months[-6:]
+    all_months = sorted(list(set(list(sprays_cost.keys()) + list(irrigations_cost.keys()) + list(other_cost.keys()))))
+    if len(all_months) > 12:
+        all_months = all_months[-12:]
         
     data = []
     for m in all_months:
         p_cost = sprays_cost.get(m, 0.0) or 0.0
         w_cost = irrigations_cost.get(m, 0.0) or 0.0
+        o_cost = other_cost.get(m, 0.0) or 0.0
         data.append({
             "month": m,
             "pesticide_cost": round(p_cost, 2),
             "water_cost": round(w_cost, 2),
-            "total": round(p_cost + w_cost, 2)
+            "other_cost": round(o_cost, 2),
+            "total": round(p_cost + w_cost + o_cost, 2)
         })
         
     return jsonify(data)

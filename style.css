@@ -62,6 +62,7 @@ body {
     height: 100vh;
     position: sticky;
     top: 0;
+    overflow-y: auto;
 }
 
 .logo-area {
@@ -1175,6 +1176,52 @@ body {
     padding: 1.5rem;
     border: 1px solid rgba(255, 255, 255, 0.03);
 }
+
+/* Dashboard Summaries and lists */
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    transition: var(--transition-smooth);
+}
+
+.summary-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.summary-item-left {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    overflow: hidden;
+}
+
+.summary-item-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.summary-item-subtitle {
+    font-size: 0.72rem;
+    color: var(--color-text-secondary);
+}
+
+.summary-item-right {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    white-space: nowrap;
+}
+
 
 
 
