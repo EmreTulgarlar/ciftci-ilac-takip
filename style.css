@@ -1125,4 +1125,56 @@ body {
     overflow: hidden;
 }
 
+/* Weather Alert Card Style */
+.weather-alert-card {
+    background: linear-gradient(135deg, rgba(26, 54, 38, 0.45) 0%, rgba(13, 27, 19, 0.45) 100%);
+    border: 1px solid rgba(0, 230, 118, 0.15);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm), 0 4px 30px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(12px);
+    transition: var(--transition-smooth);
+}
+
+.weather-alert-card:hover {
+    border-color: rgba(0, 230, 118, 0.3);
+    box-shadow: var(--shadow-md), 0 4px 30px rgba(0, 230, 118, 0.05);
+}
+
+.weather-alert-card.rainy {
+    border-color: rgba(41, 121, 255, 0.3);
+    background: linear-gradient(135deg, rgba(13, 31, 54, 0.45) 0%, rgba(8, 18, 31, 0.45) 100%);
+}
+
+.weather-alert-card.rainy #weather-rec-title {
+    color: #2979ff !important;
+}
+
+.weather-alert-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.weather-alert-icon {
+    font-size: 2.2rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Chart Styles wrapper */
+.chart-container {
+    background: rgba(255, 255, 255, 0.01);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+
 

@@ -2,14 +2,18 @@
 
 // State variables
 let sprays = [];
+let irrigations = [];
 let currentFilter = 'all';
 let searchQuery = '';
+let expensesChartInstance = null;
 
 // DOM Layout Containers
 const appContainer = document.getElementById('app-container');
 const authContainer = document.getElementById('auth-container');
 const viewDashboard = document.getElementById('view-dashboard');
 const viewAdmin = document.getElementById('view-admin');
+const viewIrrigations = document.getElementById('view-irrigations');
+const viewExpenses = document.getElementById('view-expenses');
 
 // DOM Dashboard/List Elements
 const spraysGrid = document.getElementById('sprays-grid');
@@ -18,6 +22,12 @@ const resultsCount = document.getElementById('results-count');
 const liveDateEl = document.getElementById('live-date');
 const userDisplayName = document.getElementById('user-display-name');
 const userDisplayFarm = document.getElementById('user-display-farm');
+
+// Weather Recommendation Elements
+const weatherCard = document.getElementById('weather-recommendation-card');
+const weatherRecIcon = document.getElementById('weather-rec-icon');
+const weatherRecSubtitle = document.getElementById('weather-rec-subtitle');
+const weatherRecText = document.getElementById('weather-rec-text');
 
 // Modal Elements (Spray Log)
 const sprayModal = document.getElementById('spray-modal');
@@ -36,9 +46,34 @@ const inputDate = document.getElementById('input-date');
 const inputDuration = document.getElementById('input-duration');
 const inputPhi = document.getElementById('input-phi');
 const inputDosage = document.getElementById('input-dosage');
+const inputPesticideCost = document.getElementById('input-pesticide-cost');
 const inputPest = document.getElementById('input-pest');
 const inputNotes = document.getElementById('input-notes');
 const saveBtn = document.getElementById('save-btn');
+
+// Irrigation DOM Lists
+const irrigationsGrid = document.getElementById('irrigations-grid');
+const irrigationsCount = document.getElementById('irrigations-count');
+
+// Irrigation Modal
+const irrigationModal = document.getElementById('irrigation-modal');
+const irrigationForm = document.getElementById('irrigation-form');
+const irrigationModalTitle = document.getElementById('irrigation-modal-title');
+const openIrrigationModalBtn = document.getElementById('open-irrigation-modal-btn');
+const closeIrrigationModalBtn = document.getElementById('close-irrigation-modal-btn');
+const cancelIrrigationModalBtn = document.getElementById('cancel-irrigation-modal-btn');
+
+// Irrigation Form Inputs
+const inputIrrId = document.getElementById('irrigation-id');
+const inputIrrDate = document.getElementById('input-irr-date');
+const inputIrrAmount = document.getElementById('input-irr-amount');
+const inputIrrCost = document.getElementById('input-irr-cost');
+const inputIrrNotes = document.getElementById('input-irr-notes');
+
+// Expenses Summary Cards Elements
+const expenseTotalEl = document.getElementById('expense-total');
+const expensePesticideEl = document.getElementById('expense-pesticide');
+const expenseWaterEl = document.getElementById('expense-water');
 
 // Settings Modal Elements
 const settingsModal = document.getElementById('settings-modal');
@@ -63,6 +98,11 @@ const registerForm = document.getElementById('register-form');
 const switchToRegister = document.getElementById('switch-to-register');
 const switchToLogin = document.getElementById('switch-to-login');
 const navLogout = document.getElementById('nav-logout');
+
+// Sidebar Navigation Links
+const navDashboard = document.getElementById('nav-dashboard');
+const navIrrigations = document.getElementById('nav-irrigations');
+const navExpenses = document.getElementById('nav-expenses');
 
 // Admin Panel DOM Elements
 const navAdmin = document.getElementById('nav-admin');
@@ -94,7 +134,8 @@ const mockSprays = [
         phi: 7,
         dosage: '100 ml / 100 Lt Su',
         pest: 'Kırmızı Örümcek',
-        notes: 'Giriş yaptıktan sonra kendi ilaçlarınızı kaydedip takip edebilirsiniz.'
+        notes: 'Giriş yaptıktan sonra kendi ilaçlarınızı kaydedip takip edebilirsiniz.',
+        pesticide_cost: 0.0
     }
 ];
 
@@ -156,6 +197,13 @@ function checkAuthState() {
             userDisplayFarm.textContent = `${user.farm_type || 'Belirtilmedi'} Çiftçisi`;
         }
         
+        // Show weather recommendation card if location is specified
+        if (user.location && user.location !== 'Belirtilmedi') {
+            loadWeatherAdvice();
+        } else {
+            if (weatherCard) weatherCard.style.display = 'none';
+        }
+        
         // Show Admin Nav Link if user is admin
         if (user.is_admin) {
             navAdmin.style.display = 'flex';
@@ -183,22 +231,80 @@ async function initApp() {
     }
 }
 
-// Switch between dashboard and admin panel views
+// Get Weather recommendations based on User Location
+async function loadWeatherAdvice() {
+    try {
+        const res = await apiCall('/api/weather/check');
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            weatherCard.style.display = 'block';
+            weatherRecSubtitle.textContent = `${data.location} • Sıcaklık: ${data.temp}°C • Durum: ${data.desc}`;
+            weatherRecText.textContent = data.recommendation;
+            
+            // Customize card icons & style
+            if (data.has_rained) {
+                weatherRecIcon.textContent = '🌧️';
+                weatherCard.classList.add('rainy');
+            } else {
+                const descLower = data.desc.toLowerCase();
+                if (descLower.includes('yağmur') || descLower.includes('sağanak') || descLower.includes('çise')) {
+                    weatherRecIcon.textContent = '🌦️';
+                    weatherCard.classList.add('rainy');
+                } else if (descLower.includes('güneş') || descLower.includes('açık')) {
+                    weatherRecIcon.textContent = '☀️';
+                    weatherCard.classList.remove('rainy');
+                } else {
+                    weatherRecIcon.textContent = '⛅';
+                    weatherCard.classList.remove('rainy');
+                }
+            }
+        } else {
+            if (weatherCard) weatherCard.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Weather advice fetch error:', e);
+        if (weatherCard) weatherCard.style.display = 'none';
+    }
+}
+
+// Switch between dashboard, irrigations, expenses and admin panel views
 function switchView(viewName) {
     // Remove active style from sidebar links
-    document.getElementById('nav-dashboard').classList.remove('active');
+    navDashboard.classList.remove('active');
     navAdmin.classList.remove('active');
+    if (navIrrigations) navIrrigations.classList.remove('active');
+    if (navExpenses) navExpenses.classList.remove('active');
+    
+    viewDashboard.style.display = 'none';
+    viewAdmin.style.display = 'none';
+    if (viewIrrigations) viewIrrigations.style.display = 'none';
+    if (viewExpenses) viewExpenses.style.display = 'none';
     
     if (viewName === 'dashboard') {
-        document.getElementById('nav-dashboard').classList.add('active');
+        navDashboard.classList.add('active');
         viewDashboard.style.display = 'block';
-        viewAdmin.style.display = 'none';
         initApp();
+        
+        const userStr = localStorage.getItem('tarim_takip_user');
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            if (user.location && user.location !== 'Belirtilmedi') {
+                loadWeatherAdvice();
+            }
+        }
     } else if (viewName === 'admin') {
         navAdmin.classList.add('active');
-        viewDashboard.style.display = 'none';
         viewAdmin.style.display = 'block';
         loadAdminPanel();
+    } else if (viewName === 'irrigations') {
+        if (navIrrigations) navIrrigations.classList.add('active');
+        if (viewIrrigations) viewIrrigations.style.display = 'block';
+        initIrrigations();
+    } else if (viewName === 'expenses') {
+        if (navExpenses) navExpenses.classList.add('active');
+        if (viewExpenses) viewExpenses.style.display = 'block';
+        loadExpensesPanel();
     }
 }
 
@@ -291,6 +397,10 @@ async function openAdminUserSpraysModal(targetUserId, targetUserName) {
                         <span class="label">Dozaj</span>
                         <span class="val">${item.dosage ? escapeHtml(item.dosage) : 'Belirtilmedi'}</span>
                     </div>
+                    <div class="detail-item">
+                        <span class="label">Maliyet</span>
+                        <span class="val">${item.pesticide_cost ? `${item.pesticide_cost.toFixed(2)} ₺` : 'Belirtilmedi'}</span>
+                    </div>
                 </div>
                 
                 <div class="progress-section">
@@ -302,10 +412,6 @@ async function openAdminUserSpraysModal(targetUserId, targetUserName) {
                         <div class="progress-bar-container">
                             <div class="progress-bar ${metrics.protectionDaysLeft > 0 ? 'pb-protection' : 'pb-expired'}" style="width: ${metrics.protectionPercent}%"></div>
                         </div>
-                        <div class="progress-header" style="font-size: 0.65rem; color: var(--color-text-muted);">
-                            <span>Uygulama: ${new Date(item.date).toLocaleDateString('tr-TR')}</span>
-                            <span>Bitiş: ${metrics.protectionEndDateStr}</span>
-                        </div>
                     </div>
                     <div class="progress-group">
                         <div class="progress-header">
@@ -314,10 +420,6 @@ async function openAdminUserSpraysModal(targetUserId, targetUserName) {
                         </div>
                         <div class="progress-bar-container">
                             <div class="progress-bar ${metrics.harvestDaysLeft > 0 ? 'pb-harvest' : 'pb-protection'}" style="width: ${metrics.harvestPercent}%"></div>
-                        </div>
-                        <div class="progress-header" style="font-size: 0.65rem; color: var(--color-text-muted);">
-                            <span>Gerekli Süre: ${item.phi} Gün</span>
-                            <span>Güvenli Tarih: ${metrics.harvestEndDateStr}</span>
                         </div>
                     </div>
                 </div>
@@ -328,6 +430,238 @@ async function openAdminUserSpraysModal(targetUserId, targetUserName) {
     } catch (e) {
         showToast('Çiftçi ilaç kayıtları alınamadı.', 'error');
     }
+}
+
+// Irrigation System Functions
+async function initIrrigations() {
+    try {
+        const res = await apiCall('/api/irrigations');
+        irrigations = await res.json();
+        renderIrrigations();
+    } catch (e) {
+        showToast('Sulama kayıtları yüklenemedi.', 'error');
+    }
+}
+
+function renderIrrigations() {
+    irrigationsCount.textContent = `${irrigations.length} kayıt listeleniyor`;
+    irrigationsGrid.innerHTML = '';
+    
+    if (irrigations.length === 0) {
+        irrigationsGrid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem; text-align: center; background: rgba(255, 255, 255, 0.01); border: 1px dashed var(--glass-border); border-radius: 16px;">
+                <div class="empty-icon" style="font-size: 3rem; margin-bottom: 1rem;">💧</div>
+                <h4>Henüz kayıtlı sulama faaliyeti bulunmuyor</h4>
+                <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem; max-width: 400px;">Tarlanızda harcadığınız su miktarını ve maliyetlerini takip etmek için ilk kaydınızı oluşturun.</p>
+                <button class="btn btn-primary" onclick="openIrrigationAddModal()">İlk Sulamayı Kaydet</button>
+            </div>
+        `;
+        return;
+    }
+    
+    irrigations.forEach(item => {
+        const card = createIrrigationCardElement(item);
+        irrigationsGrid.appendChild(card);
+    });
+}
+
+function createIrrigationCardElement(item) {
+    const card = document.createElement('div');
+    card.className = 'spray-card';
+    card.innerHTML = `
+        <div class="card-header-row">
+            <span class="crop-badge" style="background: rgba(41, 121, 255, 0.08); color: #2979ff; border: 1px solid rgba(41, 121, 255, 0.15);">💧 Sulama Faaliyeti</span>
+            <span class="status-badge status-harvest-safe">Tamamlandı</span>
+        </div>
+        <div>
+            <h4 class="pesticide-title">${item.water_amount ? `${item.water_amount} Ton Su Uygulandı` : 'Su Miktarı Girilmemiş'}</h4>
+            <div class="card-notes">Su Gideri: ${item.water_cost ? `${item.water_cost.toFixed(2)} ₺` : 'Maliyet Belirtilmedi'}</div>
+        </div>
+        
+        <div class="spray-details">
+            <div class="detail-item">
+                <span class="label">Uygulama Zamanı</span>
+                <span class="val">${new Date(item.date).toLocaleString('tr-TR')}</span>
+            </div>
+        </div>
+        ${item.notes ? `<p class="card-notes" title="${escapeHtml(item.notes)}"><strong>Not:</strong> ${escapeHtml(item.notes)}</p>` : ''}
+        
+        <div class="card-actions">
+            <button class="btn btn-secondary btn-icon edit-irr-btn" title="Düzenle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+            <button class="btn btn-danger btn-icon delete-irr-btn" title="Sil">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+            </button>
+        </div>
+    `;
+    
+    card.querySelector('.edit-irr-btn').addEventListener('click', () => {
+        openIrrigationEditModal(item);
+    });
+    card.querySelector('.delete-irr-btn').addEventListener('click', () => {
+        deleteIrrigation(item.id);
+    });
+    
+    return card;
+}
+
+window.openIrrigationAddModal = function() {
+    irrigationModalTitle.textContent = 'Yeni Sulama Kaydı';
+    inputIrrId.value = '';
+    
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    inputIrrDate.value = now.toISOString().slice(0, 16);
+    
+    inputIrrAmount.value = '';
+    inputIrrCost.value = '';
+    inputIrrNotes.value = '';
+    irrigationModal.classList.add('open');
+};
+
+function openIrrigationEditModal(item) {
+    irrigationModalTitle.textContent = 'Sulama Kaydını Düzenle';
+    inputIrrId.value = item.id;
+    inputIrrDate.value = item.date;
+    inputIrrAmount.value = item.water_amount || '';
+    inputIrrCost.value = item.water_cost || '';
+    inputIrrNotes.value = item.notes || '';
+    irrigationModal.classList.add('open');
+}
+
+async function saveIrrigation() {
+    const id = inputIrrId.value;
+    const irrData = {
+        id: id || 'irr-' + Date.now(),
+        date: inputIrrDate.value,
+        water_amount: parseFloat(inputIrrAmount.value) || 0.0,
+        water_cost: parseFloat(inputIrrCost.value) || 0.0,
+        notes: inputIrrNotes.value.trim()
+    };
+    
+    try {
+        if (id) {
+            await apiCall(`/api/irrigations/${id}`, 'PUT', irrData);
+            const index = irrigations.findIndex(i => i.id === id);
+            if (index !== -1) {
+                irrigations[index] = irrData;
+                showToast('Sulama kaydı güncellendi.', 'success');
+            }
+        } else {
+            await apiCall('/api/irrigations', 'POST', irrData);
+            irrigations.push(irrData);
+            showToast('Yeni sulama kaydı başarıyla eklendi.', 'success');
+        }
+        irrigationModal.classList.remove('open');
+        renderIrrigations();
+    } catch (e) {
+        showToast('Sulama kaydı kaydedilemedi.', 'error');
+    }
+}
+
+async function deleteIrrigation(id) {
+    if (confirm('Bu sulama kaydını silmek istediğinizden emin misiniz?')) {
+        try {
+            await apiCall(`/api/irrigations/${id}`, 'DELETE');
+            irrigations = irrigations.filter(i => i.id !== id);
+            renderIrrigations();
+            showToast('Sulama kaydı silindi.', 'success');
+        } catch (e) {
+            showToast('Silme işlemi başarısız oldu.', 'error');
+        }
+    }
+}
+
+// Expenses & Graphing Module
+async function loadExpensesPanel() {
+    try {
+        const res = await apiCall('/api/expenses/monthly');
+        const data = await res.json();
+        
+        let totalPesticide = 0.0;
+        let totalWater = 0.0;
+        
+        data.forEach(item => {
+            totalPesticide += item.pesticide_cost;
+            totalWater += item.water_cost;
+        });
+        
+        expenseTotalEl.textContent = `${(totalPesticide + totalWater).toFixed(2)} ₺`;
+        expensePesticideEl.textContent = `${totalPesticide.toFixed(2)} ₺`;
+        expenseWaterEl.textContent = `${totalWater.toFixed(2)} ₺`;
+        
+        drawExpensesChart(data);
+    } catch (e) {
+        showToast('Gider analizi verileri yüklenemedi.', 'error');
+    }
+}
+
+function drawExpensesChart(data) {
+    const ctx = document.getElementById('expenses-chart').getContext('2d');
+    
+    if (expensesChartInstance) {
+        expensesChartInstance.destroy();
+    }
+    
+    const months = data.map(item => item.month);
+    const pesticideCosts = data.map(item => item.pesticide_cost);
+    const waterCosts = data.map(item => item.water_cost);
+    
+    expensesChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [
+                {
+                    label: 'İlaçlama Giderleri (₺)',
+                    data: pesticideCosts,
+                    backgroundColor: 'rgba(255, 171, 0, 0.55)',
+                    borderColor: 'rgb(255, 171, 0)',
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Sulama Giderleri (₺)',
+                    data: waterCosts,
+                    backgroundColor: 'rgba(41, 121, 255, 0.55)',
+                    borderColor: 'rgb(41, 121, 255)',
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#e0e0e0',
+                        font: { family: 'Plus Jakarta Sans', size: 12, weight: '500' }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#b0b0b0', font: { family: 'Plus Jakarta Sans' } }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#b0b0b0', font: { family: 'Plus Jakarta Sans' } }
+                }
+            }
+        }
+    });
 }
 
 // Date time utilities
@@ -517,6 +851,10 @@ function createSprayCardElement(item) {
                 <span class="label">Dozaj</span>
                 <span class="val">${item.dosage ? escapeHtml(item.dosage) : 'Belirtilmedi'}</span>
             </div>
+            <div class="detail-item">
+                <span class="label">İlaç Fiyatı</span>
+                <span class="val">${item.pesticide_cost ? `${item.pesticide_cost.toFixed(2)} ₺` : 'Belirtilmedi'}</span>
+            </div>
         </div>
 
         <div class="progress-section">
@@ -615,9 +953,11 @@ function openAddModal() {
     inputId.value = '';
     inputCrop.value = '';
     inputPesticide.value = '';
+    inputDate.value = now.toISOString().slice(0, 16);
     inputDuration.value = '';
     inputPhi.value = '';
     inputDosage.value = '';
+    inputPesticideCost.value = '';
     inputPest.value = '';
     inputNotes.value = '';
     
@@ -635,6 +975,7 @@ function openEditModal(item) {
     inputDuration.value = item.duration;
     inputPhi.value = item.phi;
     inputDosage.value = item.dosage || '';
+    inputPesticideCost.value = item.pesticide_cost || '';
     inputPest.value = item.pest || '';
     inputNotes.value = item.notes || '';
     
@@ -699,8 +1040,8 @@ function setupEventListeners() {
     if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
     if (testEmailBtn) testEmailBtn.addEventListener('click', testSmtpConnection);
 
-    // Switch sidebar links between Dashboard and Admin View
-    document.getElementById('nav-dashboard').addEventListener('click', (e) => {
+    // Switch sidebar links between views
+    navDashboard.addEventListener('click', (e) => {
         e.preventDefault();
         switchView('dashboard');
     });
@@ -709,6 +1050,42 @@ function setupEventListeners() {
         navAdmin.addEventListener('click', (e) => {
             e.preventDefault();
             switchView('admin');
+        });
+    }
+    
+    if (navIrrigations) {
+        navIrrigations.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView('irrigations');
+        });
+    }
+    
+    if (navExpenses) {
+        navExpenses.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView('expenses');
+        });
+    }
+
+    // Irrigation Modal Bindings
+    if (openIrrigationModalBtn) {
+        openIrrigationModalBtn.addEventListener('click', openIrrigationAddModal);
+    }
+    if (closeIrrigationModalBtn) {
+        closeIrrigationModalBtn.addEventListener('click', () => irrigationModal.classList.remove('open'));
+    }
+    if (cancelIrrigationModalBtn) {
+        cancelIrrigationModalBtn.addEventListener('click', () => irrigationModal.classList.remove('open'));
+    }
+    if (irrigationModal) {
+        irrigationModal.addEventListener('click', (e) => {
+            if (e.target === irrigationModal) irrigationModal.classList.remove('open');
+        });
+    }
+    if (irrigationForm) {
+        irrigationForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveIrrigation();
         });
     }
 
@@ -787,6 +1164,7 @@ async function handleRegister(e) {
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
     const farm_type = document.getElementById('register-farm-type').value;
+    const location = document.getElementById('register-location').value.trim();
 
     if (password.length < 6) {
         showToast('Şifre en az 6 karakter olmalıdır.', 'error');
@@ -797,7 +1175,7 @@ async function handleRegister(e) {
         const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, password, farm_type })
+            body: JSON.stringify({ name, email, password, farm_type, location })
         });
         const result = await res.json();
         
@@ -830,6 +1208,7 @@ function handleLogoutAction() {
     localStorage.removeItem('tarim_takip_user');
     
     sprays = [];
+    irrigations = [];
     spraysGrid.innerHTML = '';
     
     showToast('Oturum sonlandırıldı.', 'success');
@@ -846,6 +1225,7 @@ async function saveForm() {
         duration: parseInt(inputDuration.value),
         phi: parseInt(inputPhi.value),
         dosage: inputDosage.value.trim(),
+        pesticide_cost: parseFloat(inputPesticideCost.value) || 0.0,
         pest: inputPest.value.trim(),
         notes: inputNotes.value.trim()
     };
@@ -957,7 +1337,7 @@ function sendEmailReport() {
 
     sprays.forEach(spray => {
         const metrics = calculateSprayMetrics(spray);
-        const detailStr = `• Ürün: ${spray.crop}\n  Kullanılan İlaç: ${spray.pesticide}\n  İlaçlama Tarihi: ${new Date(spray.date).toLocaleString('tr-TR')}\n  Dozaj: ${spray.dosage || 'Belirtilmedi'}\n  Hedef Zararlı: ${spray.pest || 'Belirtilmedi'}\n  Etki Süresi: ${spray.duration} Gün (${metrics.protectionDaysLeft > 0 ? `${metrics.protectionDaysLeft} gün koruma kaldı` : 'süre bitti'})\n  Hasat Güvenlik Aralığı (PHI): ${spray.phi} Gün (${metrics.harvestDaysLeft > 0 ? `${metrics.harvestDaysLeft} gün hasat yasağı var` : 'hasat güvenli'})\n  Durum: ${metrics.statusText}\n${spray.notes ? `  Notlar: ${spray.notes}\n` : ''}\n`;
+        const detailStr = `• Ürün: ${spray.crop}\n  Kullanılan İlaç: ${spray.pesticide}\n  İlaçlama Tarihi: ${new Date(spray.date).toLocaleString('tr-TR')}\n  Dozaj: ${spray.dosage || 'Belirtilmedi'}\n  Fiyat: ${spray.pesticide_cost ? `${spray.pesticide_cost.toFixed(2)} ₺` : 'Belirtilmedi'}\n  Hedef Zararlı: ${spray.pest || 'Belirtilmedi'}\n  Etki Süresi: ${spray.duration} Gün (${metrics.protectionDaysLeft > 0 ? `${metrics.protectionDaysLeft} gün koruma kaldı` : 'süre bitti'})\n  Hasat Güvenlik Aralığı (PHI): ${spray.phi} Gün (${metrics.harvestDaysLeft > 0 ? `${metrics.harvestDaysLeft} gün hasat yasağı var` : 'hasat güvenli'})\n  Durum: ${metrics.statusText}\n${spray.notes ? `  Notlar: ${spray.notes}\n` : ''}\n`;
 
         if (metrics.harvestDaysLeft > 0) {
             harvestWarningText += detailStr;

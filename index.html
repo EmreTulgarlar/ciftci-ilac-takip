@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="app-container" id="app-container" style="display: none;">
@@ -44,6 +45,20 @@
                         <rect x="3" y="14" width="7" height="7" rx="1.5" />
                     </svg>
                     <span>Gösterge Paneli</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-irrigations">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                    </svg>
+                    <span>Sulamalar</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-expenses">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <span>Gider Analizi</span>
                 </a>
                 <a href="#" class="nav-item" id="nav-settings">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -114,6 +129,19 @@
             </header>
 
             <div id="view-dashboard">
+            <!-- Weather Recommendation Alert Card -->
+            <div class="weather-alert-card" id="weather-recommendation-card" style="display: none; margin-bottom: 2rem;">
+                <div class="weather-alert-header">
+                    <span class="weather-alert-icon" id="weather-rec-icon">⛅</span>
+                    <div>
+                        <h4 id="weather-rec-title" style="margin: 0; font-family: var(--font-heading); color: var(--color-primary); font-size: 1.1rem;">Yağış & Hava Durumu Tavsiyesi</h4>
+                        <p id="weather-rec-subtitle" style="margin: 3px 0 0 0; font-size: 0.78rem; color: var(--color-text-muted);">Konum yükleniyor...</p>
+                    </div>
+                </div>
+                <div class="weather-alert-body" style="margin-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 0.75rem;">
+                    <p id="weather-rec-text" style="margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--color-text-secondary);">Hava durumu analiz ediliyor...</p>
+                </div>
+            </div>
             <!-- Dashboard Stats Grid -->
             <section class="stats-grid">
                 <div class="stat-card active-protection">
@@ -237,6 +265,67 @@
                     </div>
                 </section>
             </div>
+
+            <!-- Irrigations View -->
+            <div id="view-irrigations" style="display: none;">
+                <!-- Control bar for irrigation -->
+                <section class="control-bar" style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-primary add-irrigation-btn" id="open-irrigation-modal-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 18px; height: 18px; margin-right: 8px;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Yeni Sulama Ekle
+                    </button>
+                </section>
+
+                <section class="sprays-container" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 2rem; border-radius: 16px;">
+                    <div class="section-title-row">
+                        <h3>Sulama Faaliyet Kayıtları</h3>
+                        <span class="results-count" id="irrigations-count">0 kayıt</span>
+                    </div>
+                    
+                    <div class="sprays-grid" id="irrigations-grid" style="margin-top: 1.5rem;">
+                        <!-- Irrigation cards injected dynamically -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- Expense Analysis View -->
+            <div id="view-expenses" style="display: none;">
+                <section class="stats-grid" style="margin-bottom: 2rem;">
+                    <div class="stat-card total-sprays" style="border: 1px solid rgba(0, 230, 118, 0.2); background: rgba(0, 230, 118, 0.02);">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-data">
+                            <span class="stat-value" id="expense-total">0.00 ₺</span>
+                            <span class="stat-label">Toplam Harcama</span>
+                        </div>
+                    </div>
+                    <div class="stat-card harvest-warning" style="border: 1px solid rgba(255, 171, 0, 0.2); background: rgba(255, 171, 0, 0.02);">
+                        <div class="stat-icon">🧪</div>
+                        <div class="stat-data">
+                            <span class="stat-value" id="expense-pesticide">0.00 ₺</span>
+                            <span class="stat-label">Toplam İlaç Gideri</span>
+                        </div>
+                    </div>
+                    <div class="stat-card active-protection" style="border: 1px solid rgba(41, 121, 255, 0.2); background: rgba(41, 121, 255, 0.02);">
+                        <div class="stat-icon">💧</div>
+                        <div class="stat-data">
+                            <span class="stat-value" id="expense-water">0.00 ₺</span>
+                            <span class="stat-label">Toplam Sulama Gideri</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="sprays-container" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 2rem; border-radius: 16px;">
+                    <div class="section-title-row">
+                        <h3>Aylık Gider Dağılım Grafiği (Son 6 Ay)</h3>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 350px; margin-top: 2rem;">
+                        <canvas id="expenses-chart"></canvas>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
@@ -280,6 +369,10 @@
                     <div class="form-group">
                         <label for="input-dosage">Dozaj / Uygulama Oranı</label>
                         <input type="text" id="input-dosage" placeholder="Örn: 100 ml / 100 lt su">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-pesticide-cost">İlaç Fiyatı / Maliyeti (₺)</label>
+                        <input type="number" step="0.01" min="0" id="input-pesticide-cost" placeholder="Örn: 450.00">
                     </div>
                     <div class="form-group full-width">
                         <label for="input-pest">Hedef Hastalık / Zararlı</label>
@@ -406,12 +499,56 @@
                             <option value="Diğer / Belirtilmemiş">Diğer / Belirtilmemiş</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label for="register-location">Tarla Konumu (Şehir/İlçe) *</label>
+                        <input type="text" id="register-location" required placeholder="Örn: Manisa, Ödemiş, Akhisar">
+                    </div>
                     <button type="submit" class="btn btn-success auth-submit-btn">Hesap Oluştur</button>
                 </form>
                 <div class="auth-switch">
                     Zaten bir hesabınız var mı? <a href="#" id="switch-to-login">Giriş Yapın</a>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Irrigation Add/Edit Modal -->
+    <div class="modal-backdrop" id="irrigation-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="irrigation-modal-title">Yeni Sulama Kaydı</h3>
+                <button class="close-btn" id="close-irrigation-modal-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="irrigation-form" autocomplete="off">
+                <input type="hidden" id="irrigation-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="input-irr-date">Sulama Tarihi & Saati *</label>
+                        <input type="datetime-local" id="input-irr-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-irr-amount">Kullanılan Su Miktarı (Ton)</label>
+                        <input type="number" step="0.1" min="0" id="input-irr-amount" placeholder="Örn: 12.5">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-irr-cost">Toplam Su Maliyeti (₺)</label>
+                        <input type="number" step="0.01" min="0" id="input-irr-cost" placeholder="Örn: 150.00">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="input-irr-notes">Özel Notlar (Hava Sıcaklığı, Pompa Ayarı vb.)</label>
+                        <textarea id="input-irr-notes" rows="3" placeholder="Sulamayla ilgili eklemek istediğiniz detaylar..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-irrigation-modal-btn">İptal</button>
+                    <button type="submit" class="btn btn-success" id="save-irrigation-btn">Kaydet ve Ekle</button>
+                </div>
+            </form>
         </div>
     </div>
 

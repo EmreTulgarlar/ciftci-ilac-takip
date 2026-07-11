@@ -8,6 +8,7 @@ import hashlib
 import uuid
 import threading
 import smtplib
+import requests
 from email.mime.text import MIMEText
 from email.header import Header
 from flask import Flask, jsonify, request, send_from_directory
@@ -44,17 +45,21 @@ def init_db():
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
             name TEXT,
-            farm_type TEXT DEFAULT 'Belirtilmedi'
+            farm_type TEXT DEFAULT 'Belirtilmedi',
+            location TEXT DEFAULT 'Belirtilmedi'
         )
     ''')
     
-    # Migration check: Check if farm_type column exists in users table (for existing DBs)
+    # Migration checks for existing databases
     c.execute("PRAGMA table_info(users)")
     user_columns = [col[1] for col in c.fetchall()]
     if 'farm_type' not in user_columns:
         print("Migration: Adding farm_type column to users table...")
         c.execute("ALTER TABLE users ADD COLUMN farm_type TEXT DEFAULT 'Belirtilmedi'")
-    
+    if 'location' not in user_columns:
+        print("Migration: Adding location column to users table...")
+        c.execute("ALTER TABLE users ADD COLUMN location TEXT DEFAULT 'Belirtilmedi'")
+        
     c.execute('''
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id TEXT PRIMARY KEY,
@@ -88,11 +93,31 @@ def init_db():
             dosage TEXT,
             pest TEXT,
             notes TEXT,
+            pesticide_cost REAL DEFAULT 0.0,
             emailed_protection INTEGER DEFAULT 0,
             emailed_harvest INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
+    
+    c.execute("PRAGMA table_info(sprays)")
+    spray_columns = [col[1] for col in c.fetchall()]
+    if 'pesticide_cost' not in spray_columns:
+        print("Migration: Adding pesticide_cost column to sprays table...")
+        c.execute("ALTER TABLE sprays ADD COLUMN pesticide_cost REAL DEFAULT 0.0")
+        
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS irrigations (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            water_amount REAL DEFAULT 0.0,
+            water_cost REAL DEFAULT 0.0,
+            notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -212,7 +237,7 @@ def check_sprays_loop():
                         f"• İlaçlama Tarihi: {row['date']}\n"
                         f"• Etki Süresi: {row['duration']} Gün\n"
                         f"• Koruması Bittiği Tarih: {protection_end_time.strftime('%d.%m.%Y %H:%M')}\n\n"
-                        f"Tarlanızda zararlı kontrolü yapmanız ve gerekirse tekrar ilaçlama planlamanız önerilir.\n\n"
+                        f"Tarlanızda zararlı kontrolü yapmanız ve gerekirse tekrar ilaçlama planmamız önerilir.\n\n"
                         f"Bereketli günler dileriz,\nTarımTakip Sistemi"
                     )
                     if send_email(subject, body, config):
@@ -258,6 +283,7 @@ def register():
     password = data.get('password', '')
     name = data.get('name', '').strip()
     farm_type = data.get('farm_type', 'Belirtilmedi').strip()
+    location = data.get('location', 'Belirtilmedi').strip()
     
     if not email or not password or not name:
         return jsonify({"status": "error", "message": "Ad soyad, e-posta ve şifre alanları zorunludur."}), 400
@@ -275,9 +301,9 @@ def register():
     
     try:
         c.execute('''
-            INSERT INTO users (id, email, password_hash, salt, name, farm_type)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (user_id, email, password_hash, salt, name, farm_type))
+            INSERT INTO users (id, email, password_hash, salt, name, farm_type, location)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, email, password_hash, salt, name, farm_type, location))
         
         c.execute('''
             INSERT INTO user_settings (user_id, smtp_server, smtp_port, smtp_username, smtp_password, recipient_email)
@@ -330,6 +356,7 @@ def login():
             "email": user['email'],
             "name": user['name'],
             "farm_type": user['farm_type'],
+            "location": user['location'],
             "is_admin": user['email'] in ADMIN_EMAILS
         }
     })
@@ -355,7 +382,7 @@ def get_me():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT email, name, farm_type FROM users WHERE id = ?', (user_id,))
+    c.execute('SELECT email, name, farm_type, location FROM users WHERE id = ?', (user_id,))
     user = c.fetchone()
     conn.close()
     
@@ -367,6 +394,7 @@ def get_me():
                 "email": user['email'],
                 "name": user['name'],
                 "farm_type": user['farm_type'],
+                "location": user['location'],
                 "is_admin": user['email'] in ADMIN_EMAILS
             }
         })
@@ -397,7 +425,8 @@ def get_sprays():
             'phi': r['phi'],
             'dosage': r['dosage'],
             'pest': r['pest'],
-            'notes': r['notes']
+            'notes': r['notes'],
+            'pesticide_cost': r['pesticide_cost']
         })
     return jsonify(sprays_list)
 
@@ -411,8 +440,8 @@ def add_spray():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
-        INSERT INTO sprays (id, user_id, crop, pesticide, date, duration, phi, dosage, pest, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sprays (id, user_id, crop, pesticide, date, duration, phi, dosage, pest, notes, pesticide_cost)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         data['id'],
         user_id,
@@ -423,7 +452,8 @@ def add_spray():
         int(data['phi']),
         data.get('dosage', ''),
         data.get('pest', ''),
-        data.get('notes', '')
+        data.get('notes', ''),
+        float(data.get('pesticide_cost', 0.0) or 0.0)
     ))
     conn.commit()
     conn.close()
@@ -447,7 +477,7 @@ def update_spray(spray_id):
         
     c.execute('''
         UPDATE sprays
-        SET crop = ?, pesticide = ?, date = ?, duration = ?, phi = ?, dosage = ?, pest = ?, notes = ?,
+        SET crop = ?, pesticide = ?, date = ?, duration = ?, phi = ?, dosage = ?, pest = ?, notes = ?, pesticide_cost = ?,
             emailed_protection = 0, emailed_harvest = 0
         WHERE id = ? AND user_id = ?
     ''', (
@@ -459,6 +489,7 @@ def update_spray(spray_id):
         data.get('dosage', ''),
         data.get('pest', ''),
         data.get('notes', ''),
+        float(data.get('pesticide_cost', 0.0) or 0.0),
         spray_id,
         user_id
     ))
@@ -581,6 +612,221 @@ def test_email():
     else:
         return jsonify({"status": "error", "message": "Test maili gönderilemedi. Lütfen bilgilerinizi kontrol edin."})
 
+# Live Weather Checking API
+@app.route('/api/weather/check', methods=['GET'])
+def check_weather():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT location FROM users WHERE id = ?', (user_id,))
+    user = c.fetchone()
+    conn.close()
+    
+    if not user or not user['location'] or user['location'] == 'Belirtilmedi':
+        return jsonify({"status": "error", "message": "Konum bilgisi girilmemiş."}), 400
+        
+    location = user['location']
+    
+    try:
+        headers = {"Accept-Language": "tr"}
+        url = f"https://wttr.in/{location}?format=j1"
+        res = requests.get(url, headers=headers, timeout=3)
+        if res.status_code == 200:
+            data = res.json()
+            current = data.get('current_condition', [{}])[0]
+            temp = current.get('temp_C', 'N/A')
+            
+            desc = 'Bilinmiyor'
+            lang_tr = current.get('lang_tr', [])
+            if lang_tr and lang_tr[0].get('value'):
+                desc = lang_tr[0]['value']
+            else:
+                weatherDesc = current.get('weatherDesc', [])
+                if weatherDesc:
+                    desc = weatherDesc[0].get('value', 'Bilinmiyor')
+                    
+            precip = float(current.get('precipMM', '0.0'))
+            has_rained = precip > 0.5
+            
+            # Formulate recommendation
+            if has_rained:
+                recommendation = "Bugün yağmur yağdı! Toprak nemli, sulamayı erteleyerek su tasarrufu yapabilirsiniz."
+            elif "yağmur" in desc.lower() or "sağanak" in desc.lower() or precip > 0.1:
+                recommendation = "Hava yağışlı görünüyor, sulama yapmanıza gerek olmayabilir."
+            else:
+                recommendation = "Bölgenizde yağış görünmüyor. Ürünlerinizin gelişimine göre sulama yapılması önerilir."
+                
+            return jsonify({
+                "status": "success",
+                "location": location,
+                "temp": temp,
+                "desc": desc,
+                "precip": precip,
+                "has_rained": has_rained,
+                "recommendation": recommendation
+            })
+    except Exception as e:
+        print(f"Weather API error: {e}")
+        
+    # Fallback response in case API fails
+    return jsonify({
+        "status": "error",
+        "message": f"Hava durumu verisi {location} için şu an alınamadı."
+    }), 500
+
+# Irrigation CRUD APIs
+@app.route('/api/irrigations', methods=['GET'])
+def get_irrigations():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM irrigations WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    irr_list = []
+    for r in rows:
+        irr_list.append({
+            'id': r['id'],
+            'date': r['date'],
+            'water_amount': r['water_amount'],
+            'water_cost': r['water_cost'],
+            'notes': r['notes']
+        })
+    return jsonify(irr_list)
+
+@app.route('/api/irrigations', methods=['POST'])
+def add_irrigation():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO irrigations (id, user_id, date, water_amount, water_cost, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        data['id'],
+        user_id,
+        data['date'],
+        float(data.get('water_amount', 0.0) or 0.0),
+        float(data.get('water_cost', 0.0) or 0.0),
+        data.get('notes', '')
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Sulama kaydı oluşturuldu."})
+
+@app.route('/api/irrigations/<irr_id>', methods=['PUT'])
+def update_irrigation(irr_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM irrigations WHERE id = ? AND user_id = ?', (irr_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu kaydı düzenlemeye yetkiniz yok."}), 403
+        
+    c.execute('''
+        UPDATE irrigations
+        SET date = ?, water_amount = ?, water_cost = ?, notes = ?
+        WHERE id = ? AND user_id = ?
+    ''', (
+        data['date'],
+        float(data.get('water_amount', 0.0) or 0.0),
+        float(data.get('water_cost', 0.0) or 0.0),
+        data.get('notes', ''),
+        irr_id,
+        user_id
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Sulama kaydı güncellendi."})
+
+@app.route('/api/irrigations/<irr_id>', methods=['DELETE'])
+def delete_irrigation(irr_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM irrigations WHERE id = ? AND user_id = ?', (irr_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu kaydı silmeye yetkiniz yok."}), 403
+        
+    c.execute('DELETE FROM irrigations WHERE id = ? AND user_id = ?', (irr_id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Sulama kaydı silindi."})
+
+# Monthly Expense rollups
+@app.route('/api/expenses/monthly', methods=['GET'])
+def get_monthly_expenses():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Fetch monthly pesticide costs
+    c.execute('''
+        SELECT substr(date, 1, 7) as month, SUM(pesticide_cost) as pesticide_total
+        FROM sprays
+        WHERE user_id = ?
+        GROUP BY month
+    ''', (user_id,))
+    sprays_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
+    
+    # Fetch monthly irrigation costs
+    c.execute('''
+        SELECT substr(date, 1, 7) as month, SUM(water_cost) as water_total
+        FROM irrigations
+        WHERE user_id = ?
+        GROUP BY month
+    ''', (user_id,))
+    irrigations_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
+    conn.close()
+    
+    # Merge months
+    all_months = sorted(list(set(list(sprays_cost.keys()) + list(irrigations_cost.keys()))))
+    # Keep only last 6 months for chart readability
+    if len(all_months) > 6:
+        all_months = all_months[-6:]
+        
+    data = []
+    for m in all_months:
+        p_cost = sprays_cost.get(m, 0.0) or 0.0
+        w_cost = irrigations_cost.get(m, 0.0) or 0.0
+        data.append({
+            "month": m,
+            "pesticide_cost": round(p_cost, 2),
+            "water_cost": round(w_cost, 2),
+            "total": round(p_cost + w_cost, 2)
+        })
+        
+    return jsonify(data)
+
 # Admin Dashboard API Routes
 @app.route('/api/admin/users', methods=['GET'])
 def admin_get_users():
@@ -637,7 +883,8 @@ def admin_get_user_sprays(target_user_id):
             'phi': r['phi'],
             'dosage': r['dosage'],
             'pest': r['pest'],
-            'notes': r['notes']
+            'notes': r['notes'],
+            'pesticide_cost': r['pesticide_cost']
         })
     return jsonify(sprays_list)
 
