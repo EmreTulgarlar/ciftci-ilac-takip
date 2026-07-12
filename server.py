@@ -145,6 +145,41 @@ def init_db():
         )
     ''')
     
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS fields (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            farm_type TEXT NOT NULL,
+            location TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Migrations: Add field_id to sprays, irrigations, fertilizations, other_expenses
+    for table_name in ['sprays', 'irrigations', 'fertilizations', 'other_expenses']:
+        c.execute(f"PRAGMA table_info({table_name})")
+        cols = [col[1] for col in c.fetchall()]
+        if 'field_id' not in cols:
+            print(f"Migration: Adding field_id column to {table_name} table...")
+            c.execute(f"ALTER TABLE {table_name} ADD COLUMN field_id TEXT")
+            
+    # For every user in the system, if they have no fields, create a default field and bind existing rows
+    c.execute("SELECT id, farm_type, location FROM users")
+    all_users = c.fetchall()
+    for u_id, farm_type, location in all_users:
+        c.execute("SELECT id FROM fields WHERE user_id = ?", (u_id,))
+        if not c.fetchone():
+            default_field_id = f"field-default-{u_id[:8]}-{uuid.uuid4().hex[:6]}"
+            f_type = farm_type or "Zeytin"
+            loc = location or "Manisa"
+            c.execute("INSERT INTO fields (id, user_id, name, farm_type, location) VALUES (?, ?, ?, ?, ?)",
+                      (default_field_id, u_id, "Varsayılan Tarla", f_type, loc))
+            
+            # Now link existing data for this user to this default field
+            for table_name in ['sprays', 'irrigations', 'fertilizations', 'other_expenses']:
+                c.execute(f"UPDATE {table_name} SET field_id = ? WHERE user_id = ? AND (field_id IS NULL OR field_id = '')", (default_field_id, u_id))
+    
     conn.commit()
     conn.close()
 
@@ -437,7 +472,13 @@ def get_sprays():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT * FROM sprays WHERE user_id = ?', (user_id,))
+    
+    field_id = request.args.get('field_id')
+    if field_id and field_id != 'all':
+        c.execute('SELECT * FROM sprays WHERE user_id = ? AND field_id = ?', (user_id, field_id))
+    else:
+        c.execute('SELECT * FROM sprays WHERE user_id = ?', (user_id,))
+        
     rows = c.fetchall()
     conn.close()
     
@@ -453,7 +494,8 @@ def get_sprays():
             'dosage': r['dosage'],
             'pest': r['pest'],
             'notes': r['notes'],
-            'pesticide_cost': r['pesticide_cost']
+            'pesticide_cost': r['pesticide_cost'],
+            'field_id': r.get('field_id', '')
         })
     return jsonify(sprays_list)
 
@@ -467,8 +509,8 @@ def add_spray():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
-        INSERT INTO sprays (id, user_id, crop, pesticide, date, duration, phi, dosage, pest, notes, pesticide_cost)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sprays (id, user_id, crop, pesticide, date, duration, phi, dosage, pest, notes, pesticide_cost, field_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         data['id'],
         user_id,
@@ -480,7 +522,8 @@ def add_spray():
         data.get('dosage', ''),
         data.get('pest', ''),
         data.get('notes', ''),
-        float(data.get('pesticide_cost', 0.0) or 0.0)
+        float(data.get('pesticide_cost', 0.0) or 0.0),
+        data.get('field_id', '')
     ))
     conn.commit()
     conn.close()
@@ -505,7 +548,7 @@ def update_spray(spray_id):
     c.execute('''
         UPDATE sprays
         SET crop = ?, pesticide = ?, date = ?, duration = ?, phi = ?, dosage = ?, pest = ?, notes = ?, pesticide_cost = ?,
-            emailed_protection = 0, emailed_harvest = 0
+            emailed_protection = 0, emailed_harvest = 0, field_id = ?
         WHERE id = ? AND user_id = ?
     ''', (
         data['crop'],
@@ -517,6 +560,7 @@ def update_spray(spray_id):
         data.get('pest', ''),
         data.get('notes', ''),
         float(data.get('pesticide_cost', 0.0) or 0.0),
+        data.get('field_id', ''),
         spray_id,
         user_id
     ))
@@ -649,14 +693,24 @@ def check_weather():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT location FROM users WHERE id = ?', (user_id,))
-    user = c.fetchone()
+    field_id = request.args.get('field_id')
+    location = None
+    if field_id and field_id != 'all':
+        c.execute('SELECT location FROM fields WHERE id = ? AND user_id = ?', (field_id, user_id))
+        field = c.fetchone()
+        if field:
+            location = field['location']
+            
+    if not location:
+        c.execute('SELECT location FROM users WHERE id = ?', (user_id,))
+        user = c.fetchone()
+        if user and user['location'] and user['location'] != 'Belirtilmedi':
+            location = user['location']
+            
     conn.close()
     
-    if not user or not user['location'] or user['location'] == 'Belirtilmedi':
+    if not location:
         return jsonify({"status": "error", "message": "Konum bilgisi girilmemiş."}), 400
-        
-    location = user['location']
     
     try:
         headers = {"Accept-Language": "tr"}
@@ -715,7 +769,13 @@ def get_irrigations():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT * FROM irrigations WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    
+    field_id = request.args.get('field_id')
+    if field_id and field_id != 'all':
+        c.execute('SELECT * FROM irrigations WHERE user_id = ? AND field_id = ? ORDER BY date DESC', (user_id, field_id))
+    else:
+        c.execute('SELECT * FROM irrigations WHERE user_id = ? ORDER BY date DESC', (user_id,))
+        
     rows = c.fetchall()
     conn.close()
     
@@ -726,7 +786,8 @@ def get_irrigations():
             'date': r['date'],
             'water_amount': r['water_amount'],
             'water_cost': r['water_cost'],
-            'notes': r['notes']
+            'notes': r['notes'],
+            'field_id': r.get('field_id', '')
         })
     return jsonify(irr_list)
 
@@ -740,15 +801,16 @@ def add_irrigation():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
-        INSERT INTO irrigations (id, user_id, date, water_amount, water_cost, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO irrigations (id, user_id, date, water_amount, water_cost, notes, field_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', (
         data['id'],
         user_id,
         data['date'],
         float(data.get('water_amount', 0.0) or 0.0),
         float(data.get('water_cost', 0.0) or 0.0),
-        data.get('notes', '')
+        data.get('notes', ''),
+        data.get('field_id', '')
     ))
     conn.commit()
     conn.close()
@@ -772,13 +834,14 @@ def update_irrigation(irr_id):
         
     c.execute('''
         UPDATE irrigations
-        SET date = ?, water_amount = ?, water_cost = ?, notes = ?
+        SET date = ?, water_amount = ?, water_cost = ?, notes = ?, field_id = ?
         WHERE id = ? AND user_id = ?
     ''', (
         data['date'],
         float(data.get('water_amount', 0.0) or 0.0),
         float(data.get('water_cost', 0.0) or 0.0),
         data.get('notes', ''),
+        data.get('field_id', ''),
         irr_id,
         user_id
     ))
@@ -816,7 +879,13 @@ def get_other_expenses():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT * FROM other_expenses WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    
+    field_id = request.args.get('field_id')
+    if field_id and field_id != 'all':
+        c.execute('SELECT * FROM other_expenses WHERE user_id = ? AND field_id = ? ORDER BY date DESC', (user_id, field_id))
+    else:
+        c.execute('SELECT * FROM other_expenses WHERE user_id = ? ORDER BY date DESC', (user_id,))
+        
     rows = c.fetchall()
     conn.close()
     
@@ -828,7 +897,8 @@ def get_other_expenses():
             'category': r['category'],
             'amount': r['amount'],
             'date': r['date'],
-            'notes': r['notes']
+            'notes': r['notes'],
+            'field_id': r.get('field_id', '')
         })
     return jsonify(exp_list)
 
@@ -842,8 +912,8 @@ def add_other_expense():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
-        INSERT INTO other_expenses (id, user_id, title, category, amount, date, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO other_expenses (id, user_id, title, category, amount, date, notes, field_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         data['id'],
         user_id,
@@ -851,7 +921,8 @@ def add_other_expense():
         data['category'],
         float(data['amount']),
         data['date'],
-        data.get('notes', '')
+        data.get('notes', ''),
+        data.get('field_id', '')
     ))
     conn.commit()
     conn.close()
@@ -875,7 +946,7 @@ def update_other_expense(exp_id):
         
     c.execute('''
         UPDATE other_expenses
-        SET title = ?, category = ?, amount = ?, date = ?, notes = ?
+        SET title = ?, category = ?, amount = ?, date = ?, notes = ?, field_id = ?
         WHERE id = ? AND user_id = ?
     ''', (
         data['title'],
@@ -883,6 +954,7 @@ def update_other_expense(exp_id):
         float(data['amount']),
         data['date'],
         data.get('notes', ''),
+        data.get('field_id', ''),
         exp_id,
         user_id
     ))
@@ -921,21 +993,40 @@ def get_raw_expenses():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
-    # Fetch sprays with cost
-    c.execute('SELECT date, pesticide_cost, pesticide FROM sprays WHERE user_id = ? AND pesticide_cost > 0', (user_id,))
-    sprays = [{"date": r["date"], "amount": r["pesticide_cost"], "type": "pesticide", "name": r["pesticide"]} for r in c.fetchall()]
-    
-    # Fetch irrigations with cost
-    c.execute('SELECT date, water_cost, water_amount FROM irrigations WHERE user_id = ? AND water_cost > 0', (user_id,))
-    irrigations = [{"date": r["date"], "amount": r["water_cost"], "type": "water", "name": f"{r['water_amount']} Ton Sulama"} for r in c.fetchall()]
-    
-    # Fetch other expenses
-    c.execute('SELECT date, amount, title, category FROM other_expenses WHERE user_id = ?', (user_id,))
-    other = [{"date": r["date"], "amount": r["amount"], "type": "other", "name": f"{r['title']} ({r['category']})"} for r in c.fetchall()]
-    
-    # Fetch fertilizations with cost
-    c.execute('SELECT date, cost, fertilizer_name, amount FROM fertilizations WHERE user_id = ? AND cost > 0', (user_id,))
-    fertilizations = [{"date": r["date"], "amount": r["cost"], "type": "fertilizer", "name": f"{r['amount']} kg/lt {r['fertilizer_name']}"} for r in c.fetchall()]
+    field_id = request.args.get('field_id')
+    if field_id and field_id != 'all':
+        # Fetch sprays with cost
+        c.execute('SELECT date, pesticide_cost, pesticide FROM sprays WHERE user_id = ? AND field_id = ? AND pesticide_cost > 0', (user_id, field_id))
+        sprays = [{"date": r["date"], "amount": r["pesticide_cost"], "type": "pesticide", "name": r["pesticide"]} for r in c.fetchall()]
+        
+        # Fetch irrigations with cost
+        c.execute('SELECT date, water_cost, water_amount FROM irrigations WHERE user_id = ? AND field_id = ? AND water_cost > 0', (user_id, field_id))
+        irrigations = [{"date": r["date"], "amount": r["water_cost"], "type": "water", "name": f"{r['water_amount']} Ton Sulama"} for r in c.fetchall()]
+        
+        # Fetch other expenses
+        c.execute('SELECT date, amount, title, category FROM other_expenses WHERE user_id = ? AND field_id = ?', (user_id, field_id))
+        other = [{"date": r["date"], "amount": r["amount"], "type": "other", "name": f"{r['title']} ({r['category']})"} for r in c.fetchall()]
+        
+        # Fetch fertilizations with cost
+        c.execute('SELECT date, cost, fertilizer_name, amount FROM fertilizations WHERE user_id = ? AND field_id = ? AND cost > 0', (user_id, field_id))
+        fertilizations = [{"date": r["date"], "amount": r["cost"], "type": "fertilizer", "name": f"{r['amount']} kg/lt {r['fertilizer_name']}"} for r in c.fetchall()]
+    else:
+        # Fetch sprays with cost
+        c.execute('SELECT date, pesticide_cost, pesticide FROM sprays WHERE user_id = ? AND pesticide_cost > 0', (user_id,))
+        sprays = [{"date": r["date"], "amount": r["pesticide_cost"], "type": "pesticide", "name": r["pesticide"]} for r in c.fetchall()]
+        
+        # Fetch irrigations with cost
+        c.execute('SELECT date, water_cost, water_amount FROM irrigations WHERE user_id = ? AND water_cost > 0', (user_id,))
+        irrigations = [{"date": r["date"], "amount": r["water_cost"], "type": "water", "name": f"{r['water_amount']} Ton Sulama"} for r in c.fetchall()]
+        
+        # Fetch other expenses
+        c.execute('SELECT date, amount, title, category FROM other_expenses WHERE user_id = ?', (user_id,))
+        other = [{"date": r["date"], "amount": r["amount"], "type": "other", "name": f"{r['title']} ({r['category']})"} for r in c.fetchall()]
+        
+        # Fetch fertilizations with cost
+        c.execute('SELECT date, cost, fertilizer_name, amount FROM fertilizations WHERE user_id = ? AND cost > 0', (user_id,))
+        fertilizations = [{"date": r["date"], "amount": r["cost"], "type": "fertilizer", "name": f"{r['amount']} kg/lt {r['fertilizer_name']}"} for r in c.fetchall()]
+        
     conn.close()
     
     all_expenses = sprays + irrigations + other + fertilizations
@@ -1077,7 +1168,13 @@ def get_fertilizations():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute('SELECT * FROM fertilizations WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    
+    field_id = request.args.get('field_id')
+    if field_id and field_id != 'all':
+        c.execute('SELECT * FROM fertilizations WHERE user_id = ? AND field_id = ? ORDER BY date DESC', (user_id, field_id))
+    else:
+        c.execute('SELECT * FROM fertilizations WHERE user_id = ? ORDER BY date DESC', (user_id,))
+        
     rows = c.fetchall()
     conn.close()
     
@@ -1090,7 +1187,8 @@ def get_fertilizations():
             'amount': r['amount'],
             'cost': r['cost'],
             'date': r['date'],
-            'notes': r['notes']
+            'notes': r['notes'],
+            'field_id': r.get('field_id', '')
         })
     return jsonify(fert_list)
 
@@ -1104,8 +1202,8 @@ def add_fertilization():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
-        INSERT INTO fertilizations (id, user_id, crop, fertilizer_name, amount, cost, date, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO fertilizations (id, user_id, crop, fertilizer_name, amount, cost, date, notes, field_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         data['id'],
         user_id,
@@ -1114,7 +1212,8 @@ def add_fertilization():
         float(data['amount']),
         float(data.get('cost', 0.0) or 0.0),
         data['date'],
-        data.get('notes', '')
+        data.get('notes', ''),
+        data.get('field_id', '')
     ))
     conn.commit()
     conn.close()
@@ -1138,7 +1237,7 @@ def update_fertilization(fert_id):
         
     c.execute('''
         UPDATE fertilizations
-        SET crop = ?, fertilizer_name = ?, amount = ?, cost = ?, date = ?, notes = ?
+        SET crop = ?, fertilizer_name = ?, amount = ?, cost = ?, date = ?, notes = ?, field_id = ?
         WHERE id = ? AND user_id = ?
     ''', (
         data['crop'],
@@ -1147,6 +1246,7 @@ def update_fertilization(fert_id):
         float(data.get('cost', 0.0) or 0.0),
         data['date'],
         data.get('notes', ''),
+        data.get('field_id', ''),
         fert_id,
         user_id
     ))
@@ -1173,6 +1273,86 @@ def delete_fertilization(fert_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "success", "message": "Gübreleme kaydı silindi."})
+
+# Fields (Tarlalar) CRUD APIs
+@app.route('/api/fields', methods=['GET'])
+def get_fields():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM fields WHERE user_id = ? ORDER BY name ASC', (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    fields_list = []
+    for r in rows:
+        fields_list.append({
+            'id': r['id'],
+            'name': r['name'],
+            'farm_type': r['farm_type'],
+            'location': r['location']
+        })
+    return jsonify(fields_list)
+
+@app.route('/api/fields', methods=['POST'])
+def add_field():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO fields (id, user_id, name, farm_type, location)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (
+        data['id'],
+        user_id,
+        data['name'],
+        data['farm_type'],
+        data['location']
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Tarla başarıyla oluşturuldu."})
+
+@app.route('/api/fields/<field_id>', methods=['DELETE'])
+def delete_field(field_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM fields WHERE id = ? AND user_id = ?', (field_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu tarlayı silmeye yetkiniz yok."}), 403
+        
+    # Count fields left for user (user must have at least one field)
+    c.execute('SELECT COUNT(*) FROM fields WHERE user_id = ?', (user_id,))
+    count = c.fetchone()[0]
+    if count <= 1:
+        conn.close()
+        return jsonify({"status": "error", "message": "En az bir tarlanızın bulunması zorunludur."}), 400
+        
+    # Cascade delete all activities on this field manually if cascade is not triggered
+    c.execute('DELETE FROM sprays WHERE user_id = ? AND field_id = ?', (user_id, field_id))
+    c.execute('DELETE FROM irrigations WHERE user_id = ? AND field_id = ?', (user_id, field_id))
+    c.execute('DELETE FROM fertilizations WHERE user_id = ? AND field_id = ?', (user_id, field_id))
+    c.execute('DELETE FROM other_expenses WHERE user_id = ? AND field_id = ?', (user_id, field_id))
+    
+    c.execute('DELETE FROM fields WHERE id = ? AND user_id = ?', (field_id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Tarla ve tarlaya bağlı tüm faaliyetler silindi."})
 
 if __name__ == '__main__':
     init_db()

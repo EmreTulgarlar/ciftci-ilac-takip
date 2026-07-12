@@ -21,11 +21,22 @@
                     <span style="font-size: 0.75rem; color: var(--color-text-secondary); display: block; margin-top: -2px;">İlaç & Etki Takibi</span>
                 </div>
             </div>
-            <div class="user-profile-widget" id="user-profile-widget">
-                <div class="user-avatar">🧑‍🌾</div>
-                <div class="user-info">
-                    <span class="user-name" id="user-display-name">Yükleniyor...</span>
-                    <span class="user-role" id="user-display-farm">Çiftçi</span>
+            <div class="user-profile-widget" id="user-profile-widget" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="user-avatar">🧑‍🌾</div>
+                    <div class="user-info">
+                        <span class="user-name" id="user-display-name">Yükleniyor...</span>
+                        <span class="user-role" id="user-display-farm" style="font-size: 0.7rem; opacity: 0.8; margin-top: 1px;">Aktif Tarla:</span>
+                    </div>
+                </div>
+                <!-- Field Dropdown Selector -->
+                <div class="field-selector-container" style="margin-top: 2px; display: flex; gap: 6px; align-items: center;">
+                    <select id="sidebar-field-select" style="flex: 1; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; font-family: var(--font-body); outline: none; cursor: pointer;">
+                        <!-- Options injected dynamically -->
+                    </select>
+                    <button id="sidebar-add-field-btn" style="background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.3); color: #00e676; border-radius: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;" title="Yeni Tarla Ekle">
+                        <strong style="font-size: 1.1rem; line-height: 1;">+</strong>
+                    </button>
                 </div>
             </div>
 
@@ -481,6 +492,12 @@
             <form id="spray-form" autocomplete="off">
                 <input type="hidden" id="spray-id">
                 <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input-spray-field">Uygulanan Tarla *</label>
+                        <select id="input-spray-field" required>
+                            <!-- Injected dynamically -->
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label for="input-crop">Uygulanan Mahsul / Ürün *</label>
                         <input type="text" id="input-crop" required placeholder="Örn: Domates, Elma, Buğday">
@@ -523,6 +540,52 @@
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" id="cancel-modal-btn">İptal</button>
                     <button type="submit" class="btn btn-success" id="save-btn">Kaydet ve Takibe Başla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Field Add Modal -->
+    <div class="modal-backdrop" id="field-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Yeni Tarla / Bahçe Ekle</h3>
+                <button class="close-btn" id="close-field-modal-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="field-form" autocomplete="off">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input-field-name">Tarla / Bahçe Adı *</label>
+                        <input type="text" id="input-field-name" required placeholder="Örn: Dere Boyu Zeytinlik, Ev Arkası Sebze Bahçesi">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-field-type">Tarla / Mahsul Türü *</label>
+                        <select id="input-field-type" required>
+                            <option value="Zeytin">Zeytin</option>
+                            <option value="Üzüm">Üzüm</option>
+                            <option value="Hobi Bahçesi">Hobi Bahçesi</option>
+                            <option value="Narenciye">Narenciye</option>
+                            <option value="Tahıl/Buğday">Tahıl / Buğday</option>
+                            <option value="Meyve Bahçesi">Meyve Bahçesi</option>
+                            <option value="Sebze Serası">Sebze Serası</option>
+                            <option value="Pamuk">Pamuk</option>
+                            <option value="Mısır">Mısır</option>
+                            <option value="Diğer">Diğer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-field-location">Tarla Konumu (İlçe/İl) *</label>
+                        <input type="text" id="input-field-location" required placeholder="Örn: Akhisar, Manisa">
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" id="cancel-field-modal-btn">İptal</button>
+                    <button type="submit" class="btn btn-success">Kaydet ve Oluştur</button>
                 </div>
             </form>
         </div>
@@ -587,6 +650,12 @@
             <form id="fertilization-form" autocomplete="off">
                 <input type="hidden" id="fertilization-id">
                 <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input-fert-field">Uygulanan Tarla *</label>
+                        <select id="input-fert-field" required>
+                            <!-- Injected dynamically -->
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label for="input-fert-crop">Uygulanan Mahsul / Ürün *</label>
                         <input type="text" id="input-fert-crop" required placeholder="Örn: Zeytin, Üzüm, Domates">
@@ -635,6 +704,12 @@
             <form id="other-expense-form" autocomplete="off">
                 <input type="hidden" id="other-expense-id">
                 <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input-exp-field">Uygulanan Tarla *</label>
+                        <select id="input-exp-field" required>
+                            <!-- Injected dynamically -->
+                        </select>
+                    </div>
                     <div class="form-group full-width">
                         <label for="input-exp-title">Gider Tanımı / Başlığı *</label>
                         <input type="text" id="input-exp-title" required placeholder="Örn: 2 Çuval Gübre Alımı, Mazot Alımı, Traktör Yağı">
@@ -756,6 +831,12 @@
             <form id="irrigation-form" autocomplete="off">
                 <input type="hidden" id="irrigation-id">
                 <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input-irr-field">Uygulanan Tarla *</label>
+                        <select id="input-irr-field" required>
+                            <!-- Injected dynamically -->
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label for="input-irr-date">Sulama Tarihi & Saati *</label>
                         <input type="datetime-local" id="input-irr-date" required>
