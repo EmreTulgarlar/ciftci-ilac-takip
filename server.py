@@ -131,6 +131,20 @@ def init_db():
         )
     ''')
     
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS fertilizations (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            crop TEXT NOT NULL,
+            fertilizer_name TEXT NOT NULL,
+            amount REAL NOT NULL,
+            cost REAL DEFAULT 0.0,
+            date TEXT NOT NULL,
+            notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -918,9 +932,13 @@ def get_raw_expenses():
     # Fetch other expenses
     c.execute('SELECT date, amount, title, category FROM other_expenses WHERE user_id = ?', (user_id,))
     other = [{"date": r["date"], "amount": r["amount"], "type": "other", "name": f"{r['title']} ({r['category']})"} for r in c.fetchall()]
+    
+    # Fetch fertilizations with cost
+    c.execute('SELECT date, cost, fertilizer_name, amount FROM fertilizations WHERE user_id = ? AND cost > 0', (user_id,))
+    fertilizations = [{"date": r["date"], "amount": r["cost"], "type": "fertilizer", "name": f"{r['amount']} kg/lt {r['fertilizer_name']}"} for r in c.fetchall()]
     conn.close()
     
-    all_expenses = sprays + irrigations + other
+    all_expenses = sprays + irrigations + other + fertilizations
     return jsonify(all_expenses)
 
 # Monthly Expense rollups (legacy support)
@@ -956,10 +974,18 @@ def get_monthly_expenses():
         GROUP BY month
     ''', (user_id,))
     other_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
+    
+    c.execute('''
+        SELECT substr(date, 1, 7) as month, SUM(cost) as fertilizer_total
+        FROM fertilizations
+        WHERE user_id = ?
+        GROUP BY month
+    ''', (user_id,))
+    fertilizers_cost = {row[0]: row[1] for row in c.fetchall() if row[0]}
     conn.close()
     
     # Merge months
-    all_months = sorted(list(set(list(sprays_cost.keys()) + list(irrigations_cost.keys()) + list(other_cost.keys()))))
+    all_months = sorted(list(set(list(sprays_cost.keys()) + list(irrigations_cost.keys()) + list(other_cost.keys()) + list(fertilizers_cost.keys()))))
     if len(all_months) > 12:
         all_months = all_months[-12:]
         
@@ -968,12 +994,14 @@ def get_monthly_expenses():
         p_cost = sprays_cost.get(m, 0.0) or 0.0
         w_cost = irrigations_cost.get(m, 0.0) or 0.0
         o_cost = other_cost.get(m, 0.0) or 0.0
+        f_cost = fertilizers_cost.get(m, 0.0) or 0.0
         data.append({
             "month": m,
             "pesticide_cost": round(p_cost, 2),
             "water_cost": round(w_cost, 2),
             "other_cost": round(o_cost, 2),
-            "total": round(p_cost + w_cost + o_cost, 2)
+            "fertilizer_cost": round(f_cost, 2),
+            "total": round(p_cost + w_cost + o_cost + f_cost, 2)
         })
         
     return jsonify(data)
@@ -1038,6 +1066,113 @@ def admin_get_user_sprays(target_user_id):
             'pesticide_cost': r['pesticide_cost']
         })
     return jsonify(sprays_list)
+
+# Fertilization (Gübreleme) CRUD APIs
+@app.route('/api/fertilizations', methods=['GET'])
+def get_fertilizations():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM fertilizations WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    fert_list = []
+    for r in rows:
+        fert_list.append({
+            'id': r['id'],
+            'crop': r['crop'],
+            'fertilizer_name': r['fertilizer_name'],
+            'amount': r['amount'],
+            'cost': r['cost'],
+            'date': r['date'],
+            'notes': r['notes']
+        })
+    return jsonify(fert_list)
+
+@app.route('/api/fertilizations', methods=['POST'])
+def add_fertilization():
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO fertilizations (id, user_id, crop, fertilizer_name, amount, cost, date, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        data['id'],
+        user_id,
+        data['crop'],
+        data['fertilizer_name'],
+        float(data['amount']),
+        float(data.get('cost', 0.0) or 0.0),
+        data['date'],
+        data.get('notes', '')
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gübreleme kaydı başarıyla oluşturuldu."})
+
+@app.route('/api/fertilizations/<fert_id>', methods=['PUT'])
+def update_fertilization(fert_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    data = request.json
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM fertilizations WHERE id = ? AND user_id = ?', (fert_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu kaydı düzenlemeye yetkiniz yok."}), 403
+        
+    c.execute('''
+        UPDATE fertilizations
+        SET crop = ?, fertilizer_name = ?, amount = ?, cost = ?, date = ?, notes = ?
+        WHERE id = ? AND user_id = ?
+    ''', (
+        data['crop'],
+        data['fertilizer_name'],
+        float(data['amount']),
+        float(data.get('cost', 0.0) or 0.0),
+        data['date'],
+        data.get('notes', ''),
+        fert_id,
+        user_id
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gübreleme kaydı güncellendi."})
+
+@app.route('/api/fertilizations/<fert_id>', methods=['DELETE'])
+def delete_fertilization(fert_id):
+    user_id = get_user_from_request()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Oturum açılması gerekiyor."}), 401
+        
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Verify owner
+    c.execute('SELECT id FROM fertilizations WHERE id = ? AND user_id = ?', (fert_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"status": "error", "message": "Bu kaydı silmeye yetkiniz yok."}), 403
+        
+    c.execute('DELETE FROM fertilizations WHERE id = ? AND user_id = ?', (fert_id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gübreleme kaydı silindi."})
 
 if __name__ == '__main__':
     init_db()

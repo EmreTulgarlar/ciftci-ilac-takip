@@ -51,6 +51,12 @@
                     </svg>
                     <span>Sulamalar</span>
                 </a>
+                <a href="#" class="nav-item" id="nav-fertilizations">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                    </svg>
+                    <span>Gübrelemeler</span>
+                </a>
                 <a href="#" class="nav-item" id="nav-other-expenses">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
@@ -223,7 +229,18 @@
                     </div>
                 </div>
 
-                <!-- Column 3: Son Harici Giderler -->
+                <!-- Column 3: Son Gübrelemeler -->
+                <div class="summary-box" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 16px;">
+                    <div class="section-title-row" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; font-family: var(--font-heading); color: var(--color-primary); font-size: 1rem;">Son Gübrelemeler</h4>
+                        <a href="#" class="view-all-link" id="dashboard-to-fertilizations" style="font-size: 0.8rem; color: #00b0ff; text-decoration: none; font-weight: 500;">Tümünü Gör</a>
+                    </div>
+                    <div class="summary-list" id="dashboard-fertilizations-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- injected by JS -->
+                    </div>
+                </div>
+
+                <!-- Column 4: Son Harici Giderler -->
                 <div class="summary-box" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 16px;">
                     <div class="section-title-row" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
                         <h4 style="margin: 0; font-family: var(--font-heading); color: var(--color-primary); font-size: 1rem;">Son Giderler</h4>
@@ -338,6 +355,31 @@
                 </section>
             </div>
 
+            <!-- Fertilizations (Gübrelemeler) View -->
+            <div id="view-fertilizations" style="display: none;">
+                <!-- Control bar for fertilizations -->
+                <section class="control-bar" style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-primary" id="open-fertilization-modal-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 18px; height: 18px; margin-right: 8px;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Yeni Gübreleme Ekle
+                    </button>
+                </section>
+
+                <section class="sprays-container" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 2rem; border-radius: 16px;">
+                    <div class="section-title-row">
+                        <h3>Gübreleme Faaliyet Kayıtları</h3>
+                        <span class="results-count" id="fertilizations-count">0 kayıt</span>
+                    </div>
+                    
+                    <div class="sprays-grid" id="fertilizations-grid" style="margin-top: 1.5rem;">
+                        <!-- Fertilization cards injected dynamically -->
+                    </div>
+                </section>
+            </div>
+
             <!-- Other Expenses (Harici Giderler) View -->
             <div id="view-other-expenses" style="display: none;">
                 <!-- Control bar for other expenses -->
@@ -392,6 +434,13 @@
                         <div class="stat-data">
                             <span class="stat-value" id="expense-other">0.00 ₺</span>
                             <span class="stat-label">Toplam Harici Gider</span>
+                        </div>
+                    </div>
+                    <div class="stat-card active-protection" style="border: 1px solid rgba(0, 230, 118, 0.2); background: rgba(0, 230, 118, 0.02);">
+                        <div class="stat-icon">🌿</div>
+                        <div class="stat-data">
+                            <span class="stat-value" id="expense-fertilizer">0.00 ₺</span>
+                            <span class="stat-label">Toplam Gübre Gideri</span>
                         </div>
                     </div>
                 </section>
@@ -518,6 +567,54 @@
                     <button type="button" class="btn btn-secondary" id="test-email-btn">Bağlantıyı Test Et</button>
                     <button type="button" class="btn btn-secondary" id="cancel-settings-btn">İptal</button>
                     <button type="submit" class="btn btn-success">Ayarları Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Fertilization Add/Edit Modal -->
+    <div class="modal-backdrop" id="fertilization-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="fertilization-modal-title">Yeni Gübreleme Kaydı</h3>
+                <button class="close-btn" id="close-fertilization-modal-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="fertilization-form" autocomplete="off">
+                <input type="hidden" id="fertilization-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="input-fert-crop">Uygulanan Mahsul / Ürün *</label>
+                        <input type="text" id="input-fert-crop" required placeholder="Örn: Zeytin, Üzüm, Domates">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-fert-name">Kullanılan Gübre Adı *</label>
+                        <input type="text" id="input-fert-name" required placeholder="Örn: NPK 15-15-15, Üre, Amonyum Sülfat">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-fert-amount">Gübre Miktarı (Kg / Lt) *</label>
+                        <input type="number" step="0.1" min="0.1" id="input-fert-amount" required placeholder="Örn: 25.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-fert-cost">Toplam Gübre Maliyeti (₺)</label>
+                        <input type="number" step="0.01" min="0" id="input-fert-cost" placeholder="Örn: 450.00">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="input-fert-date">Uygulama Tarihi & Saati *</label>
+                        <input type="datetime-local" id="input-fert-date" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="input-fert-notes">Özel Notlar (Hava sıcaklığı, toprak nemi vb.)</label>
+                        <textarea id="input-fert-notes" rows="3" placeholder="Uygulamayla ilgili eklemek istediğiniz detaylar..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-fertilization-modal-btn">İptal</button>
+                    <button type="submit" class="btn btn-success" id="save-fertilization-btn">Kaydet ve Ekle</button>
                 </div>
             </form>
         </div>

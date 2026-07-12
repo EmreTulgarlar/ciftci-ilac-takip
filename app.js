@@ -4,6 +4,7 @@
 let sprays = [];
 let irrigations = [];
 let otherExpenses = [];
+let fertilizations = [];
 let rawExpensesData = [];
 let currentFilter = 'all';
 let searchQuery = '';
@@ -15,6 +16,7 @@ const authContainer = document.getElementById('auth-container');
 const viewDashboard = document.getElementById('view-dashboard');
 const viewSprays = document.getElementById('view-sprays');
 const viewIrrigations = document.getElementById('view-irrigations');
+const viewFertilizations = document.getElementById('view-fertilizations');
 const viewOtherExpenses = document.getElementById('view-other-expenses');
 const viewExpenses = document.getElementById('view-expenses');
 const viewAdmin = document.getElementById('view-admin');
@@ -33,6 +35,7 @@ const weatherRecText = document.getElementById('weather-rec-text');
 // Dashboard Summary Lists
 const dashboardSpraysList = document.getElementById('dashboard-sprays-list');
 const dashboardIrrigationsList = document.getElementById('dashboard-irrigations-list');
+const dashboardFertilizationsList = document.getElementById('dashboard-fertilizations-list');
 const dashboardOtherExpensesList = document.getElementById('dashboard-other-expenses-list');
 
 // Decoupled Sprays View Elements
@@ -82,6 +85,27 @@ const inputIrrAmount = document.getElementById('input-irr-amount');
 const inputIrrCost = document.getElementById('input-irr-cost');
 const inputIrrNotes = document.getElementById('input-irr-notes');
 
+// Fertilization DOM Lists
+const fertilizationsGrid = document.getElementById('fertilizations-grid');
+const fertilizationsCount = document.getElementById('fertilizations-count');
+
+// Fertilization Modal
+const fertilizationModal = document.getElementById('fertilization-modal');
+const fertilizationForm = document.getElementById('fertilization-form');
+const fertilizationModalTitle = document.getElementById('fertilization-modal-title');
+const openFertilizationModalBtn = document.getElementById('open-fertilization-modal-btn');
+const closeFertilizationModalBtn = document.getElementById('close-fertilization-modal-btn');
+const cancelFertilizationModalBtn = document.getElementById('cancel-fertilization-modal-btn');
+
+// Fertilization Form Inputs
+const inputFertId = document.getElementById('fertilization-id');
+const inputFertCrop = document.getElementById('input-fert-crop');
+const inputFertName = document.getElementById('input-fert-name');
+const inputFertAmount = document.getElementById('input-fert-amount');
+const inputFertCost = document.getElementById('input-fert-cost');
+const inputFertDate = document.getElementById('input-fert-date');
+const inputFertNotes = document.getElementById('input-fert-notes');
+
 // Other Expenses DOM Lists
 const otherExpensesGrid = document.getElementById('other-expenses-grid');
 const otherExpensesCount = document.getElementById('other-expenses-count');
@@ -106,6 +130,7 @@ const inputExpNotes = document.getElementById('input-exp-notes');
 const expenseTotalEl = document.getElementById('expense-total');
 const expensePesticideEl = document.getElementById('expense-pesticide');
 const expenseWaterEl = document.getElementById('expense-water');
+const expenseFertilizerEl = document.getElementById('expense-fertilizer');
 const expenseOtherEl = document.getElementById('expense-other');
 const expenseRangeSelect = document.getElementById('expense-range-select');
 
@@ -136,6 +161,7 @@ const navLogout = document.getElementById('nav-logout');
 const navDashboard = document.getElementById('nav-dashboard');
 const navSprays = document.getElementById('nav-sprays');
 const navIrrigations = document.getElementById('nav-irrigations');
+const navFertilizations = document.getElementById('nav-fertilizations');
 const navOtherExpenses = document.getElementById('nav-other-expenses');
 const navExpenses = document.getElementById('nav-expenses');
 const navSettings = document.getElementById('nav-settings');
@@ -227,20 +253,19 @@ function checkAuthState() {
 // Initialize Dashboard Data
 async function initDashboard() {
     try {
-        // Fetch stats & recent lists
         const resSprays = await apiCall('/api/sprays');
         sprays = await resSprays.json();
         
         const resIrr = await apiCall('/api/irrigations');
         irrigations = await resIrr.json();
         
+        const resFert = await apiCall('/api/fertilizations');
+        fertilizations = await resFert.json();
+        
         const resExp = await apiCall('/api/other-expenses');
         otherExpenses = await resExp.json();
         
-        // Render stats counters
         updateStats();
-        
-        // Render recent activities lists (Dashboard Cards)
         renderDashboardSummaries();
     } catch (e) {
         console.error(e);
@@ -248,7 +273,7 @@ async function initDashboard() {
     }
 }
 
-// Render Son 3 Faaliyet lists inside Dashboard Summary columns
+// Render Son 4 Faaliyet lists inside Dashboard Summary columns
 function renderDashboardSummaries() {
     // 1. Son 3 İlaçlama
     dashboardSpraysList.innerHTML = '';
@@ -296,7 +321,27 @@ function renderDashboardSummaries() {
         });
     }
 
-    // 3. Son 3 Harici Gider
+    // 3. Son 3 Gübreleme
+    dashboardFertilizationsList.innerHTML = '';
+    const recentFertilizations = fertilizations.slice(0, 3);
+    if (recentFertilizations.length === 0) {
+        dashboardFertilizationsList.innerHTML = `<div style="text-align: center; color: var(--color-text-muted); font-size: 0.8rem; padding: 1rem 0;">Kayıt bulunmuyor.</div>`;
+    } else {
+        recentFertilizations.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'summary-item';
+            div.innerHTML = `
+                <div class="summary-item-left">
+                    <span class="summary-item-title">${escapeHtml(item.fertilizer_name)}</span>
+                    <span class="summary-item-subtitle">${escapeHtml(item.crop)} • ${item.amount} Kg/Lt</span>
+                </div>
+                <span class="summary-item-right" style="color: #00e676;">${item.cost ? `${item.cost.toFixed(2)} ₺` : '0.00 ₺'}</span>
+            `;
+            dashboardFertilizationsList.appendChild(div);
+        });
+    }
+
+    // 4. Son 3 Harici Gider
     dashboardOtherExpensesList.innerHTML = '';
     const recentOther = otherExpenses.slice(0, 3);
     if (recentOther.length === 0) {
@@ -359,6 +404,7 @@ function switchView(viewName) {
     navDashboard.classList.remove('active');
     navSprays.classList.remove('active');
     navIrrigations.classList.remove('active');
+    if (navFertilizations) navFertilizations.classList.remove('active');
     navOtherExpenses.classList.remove('active');
     navExpenses.classList.remove('active');
     navSettings.classList.remove('active');
@@ -367,6 +413,7 @@ function switchView(viewName) {
     viewDashboard.style.display = 'none';
     viewSprays.style.display = 'none';
     viewIrrigations.style.display = 'none';
+    if (viewFertilizations) viewFertilizations.style.display = 'none';
     viewOtherExpenses.style.display = 'none';
     viewExpenses.style.display = 'none';
     viewAdmin.style.display = 'none';
@@ -391,6 +438,10 @@ function switchView(viewName) {
         navIrrigations.classList.add('active');
         viewIrrigations.style.display = 'block';
         initIrrigations();
+    } else if (viewName === 'fertilizations') {
+        if (navFertilizations) navFertilizations.classList.add('active');
+        if (viewFertilizations) viewFertilizations.style.display = 'block';
+        initFertilizations();
     } else if (viewName === 'other-expenses') {
         navOtherExpenses.classList.add('active');
         viewOtherExpenses.style.display = 'block';
@@ -741,6 +792,167 @@ async function deleteIrrigation(id) {
     }
 }
 
+// Fertilization (Gübreleme) CRUD Module
+async function initFertilizations() {
+    try {
+        const res = await apiCall('/api/fertilizations');
+        fertilizations = await res.json();
+        renderFertilizations();
+    } catch (e) {
+        showToast('Gübreleme kayıtları yüklenemedi.', 'error');
+    }
+}
+
+function renderFertilizations() {
+    fertilizationsCount.textContent = `${fertilizations.length} kayıt listeleniyor`;
+    fertilizationsGrid.innerHTML = '';
+    
+    if (fertilizations.length === 0) {
+        fertilizationsGrid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem; text-align: center; background: rgba(255, 255, 255, 0.01); border: 1px dashed var(--glass-border); border-radius: 16px;">
+                <div class="empty-icon" style="font-size: 3rem; margin-bottom: 1rem;">🌿</div>
+                <h4>Henüz kayıtlı gübreleme faaliyeti bulunmuyor</h4>
+                <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem; max-width: 400px;">Tarlanıza uyguladığınız gübre miktarlarını ve maliyetlerini takip etmek için ilk kaydınızı oluşturun.</p>
+                <button class="btn btn-primary" onclick="openFertilizationAddModal()">İlk Gübrelemeyi Kaydet</button>
+            </div>
+        `;
+        return;
+    }
+    
+    fertilizations.forEach(item => {
+        const card = createFertilizationCardElement(item);
+        fertilizationsGrid.appendChild(card);
+    });
+}
+
+function createFertilizationCardElement(item) {
+    const card = document.createElement('div');
+    card.className = 'spray-card';
+    card.innerHTML = `
+        <div class="card-header-row">
+            <span class="crop-badge" style="background: rgba(0, 230, 118, 0.08); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.15);">🌿 Gübreleme Faaliyeti</span>
+            <span class="status-badge status-harvest-safe">Tamamlandı</span>
+        </div>
+        <div>
+            <h4 class="pesticide-title">${escapeHtml(item.fertilizer_name)} (${item.amount} Kg/Lt)</h4>
+            <div class="card-notes">Uygulanan Ürün: ${escapeHtml(item.crop)}</div>
+            <div class="card-notes">Gübre Gideri: ${item.cost ? `${item.cost.toFixed(2)} ₺` : 'Maliyet Belirtilmedi'}</div>
+        </div>
+        
+        <div class="spray-details">
+            <div class="detail-item">
+                <span class="label">Uygulama Zamanı</span>
+                <span class="val">${new Date(item.date).toLocaleString('tr-TR')}</span>
+            </div>
+        </div>
+        ${item.notes ? `<p class="card-notes" title="${escapeHtml(item.notes)}"><strong>Not:</strong> ${escapeHtml(item.notes)}</p>` : ''}
+        
+        <div class="card-actions">
+            <button class="btn btn-secondary btn-icon edit-fert-btn" title="Düzenle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+            <button class="btn btn-danger btn-icon delete-fert-btn" title="Sil">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+            </button>
+        </div>
+    `;
+    
+    card.querySelector('.edit-fert-btn').addEventListener('click', () => {
+        openFertilizationEditModal(item);
+    });
+    card.querySelector('.delete-fert-btn').addEventListener('click', () => {
+        deleteFertilization(item.id);
+    });
+    
+    return card;
+}
+
+window.openFertilizationAddModal = function() {
+    fertilizationModalTitle.textContent = 'Yeni Gübreleme Kaydı';
+    inputFertId.value = '';
+    
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    inputFertDate.value = now.toISOString().slice(0, 16);
+    
+    inputFertCrop.value = '';
+    inputFertName.value = '';
+    inputFertAmount.value = '';
+    inputFertCost.value = '';
+    inputFertNotes.value = '';
+    fertilizationModal.classList.add('open');
+};
+
+function openFertilizationEditModal(item) {
+    fertilizationModalTitle.textContent = 'Gübreleme Kaydını Düzenle';
+    inputFertId.value = item.id;
+    inputFertCrop.value = item.crop;
+    inputFertName.value = item.fertilizer_name;
+    inputFertAmount.value = item.amount;
+    inputFertCost.value = item.cost || '';
+    inputFertDate.value = item.date;
+    inputFertNotes.value = item.notes || '';
+    fertilizationModal.classList.add('open');
+}
+
+async function saveFertilization() {
+    const id = inputFertId.value;
+    const fertData = {
+        id: id || 'fert-' + Date.now(),
+        crop: inputFertCrop.value.trim(),
+        fertilizer_name: inputFertName.value.trim(),
+        amount: parseFloat(inputFertAmount.value) || 0.0,
+        cost: parseFloat(inputFertCost.value) || 0.0,
+        date: inputFertDate.value,
+        notes: inputFertNotes.value.trim()
+    };
+    
+    if (!fertData.crop || !fertData.fertilizer_name || fertData.amount <= 0) {
+        showToast('Mahsul, Gübre adı ve geçerli miktar girmelisiniz.', 'error');
+        return;
+    }
+    
+    try {
+        if (id) {
+            await apiCall(`/api/fertilizations/${id}`, 'PUT', fertData);
+            const index = fertilizations.findIndex(f => f.id === id);
+            if (index !== -1) {
+                fertilizations[index] = fertData;
+                showToast('Gübreleme kaydı güncellendi.', 'success');
+            }
+        } else {
+            await apiCall('/api/fertilizations', 'POST', fertData);
+            fertilizations.push(fertData);
+            showToast('Yeni gübreleme kaydı başarıyla eklendi.', 'success');
+        }
+        fertilizationModal.classList.remove('open');
+        renderFertilizations();
+    } catch (e) {
+        showToast('Gübreleme kaydı kaydedilemedi.', 'error');
+    }
+}
+
+async function deleteFertilization(id) {
+    if (confirm('Bu gübreleme kaydını silmek istediğinizden emin misiniz?')) {
+        try {
+            await apiCall(`/api/fertilizations/${id}`, 'DELETE');
+            fertilizations = fertilizations.filter(f => f.id !== id);
+            renderFertilizations();
+            showToast('Gübreleme kaydı silindi.', 'success');
+        } catch (e) {
+            showToast('Silme işlemi başarısız oldu.', 'error');
+        }
+    }
+}
+
 // Other Expenses (Harici Giderler) CRUD Module
 async function initOtherExpenses() {
     try {
@@ -901,27 +1113,27 @@ async function deleteOtherExpense(id) {
 // Custom Date Filter & Stacked/Grouped Charting
 async function loadExpensesPanel() {
     try {
-        // Fetch raw costs payload
         const res = await apiCall('/api/expenses/raw');
         rawExpensesData = await res.json();
         
-        // Sum up total absolute values
         let totalPesticide = 0.0;
         let totalWater = 0.0;
         let totalOther = 0.0;
+        let totalFertilizer = 0.0;
         
         rawExpensesData.forEach(item => {
             if (item.type === 'pesticide') totalPesticide += item.amount;
             else if (item.type === 'water') totalWater += item.amount;
             else if (item.type === 'other') totalOther += item.amount;
+            else if (item.type === 'fertilizer') totalFertilizer += item.amount;
         });
         
-        expenseTotalEl.textContent = `${(totalPesticide + totalWater + totalOther).toFixed(2)} ₺`;
+        expenseTotalEl.textContent = `${(totalPesticide + totalWater + totalOther + totalFertilizer).toFixed(2)} ₺`;
         expensePesticideEl.textContent = `${totalPesticide.toFixed(2)} ₺`;
         expenseWaterEl.textContent = `${totalWater.toFixed(2)} ₺`;
         expenseOtherEl.textContent = `${totalOther.toFixed(2)} ₺`;
+        expenseFertilizerEl.textContent = `${totalFertilizer.toFixed(2)} ₺`;
         
-        // Generate chart with default selected range
         refreshExpensesChart();
     } catch (e) {
         showToast('Gider analizi verileri alınamadı.', 'error');
@@ -956,6 +1168,14 @@ function refreshExpensesChart() {
                     data: aggregated.water,
                     backgroundColor: 'rgba(41, 121, 255, 0.65)',
                     borderColor: 'rgb(41, 121, 255)',
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Gübreleme Giderleri (₺)',
+                    data: aggregated.fertilizer,
+                    backgroundColor: 'rgba(0, 230, 118, 0.65)',
+                    borderColor: 'rgb(0, 230, 118)',
                     borderWidth: 1.5,
                     borderRadius: 4
                 },
@@ -1042,7 +1262,7 @@ function aggregateExpenses(raw, range) {
         let current = new Date(cutoffDate);
         while (current <= now) {
             const key = formatDateKeyDay(current);
-            groups[key] = { label: key, pesticide: 0, water: 0, other: 0 };
+            groups[key] = { label: key, pesticide: 0, water: 0, other: 0, fertilizer: 0 };
             current.setDate(current.getDate() + 1);
         }
     } else {
@@ -1050,7 +1270,7 @@ function aggregateExpenses(raw, range) {
         let current = new Date(cutoffDate);
         while (current <= now || (current.getMonth() === now.getMonth() && current.getFullYear() === now.getFullYear())) {
             const key = formatDateKeyMonth(current);
-            groups[key] = { label: key, pesticide: 0, water: 0, other: 0 };
+            groups[key] = { label: key, pesticide: 0, water: 0, other: 0, fertilizer: 0 };
             current.setMonth(current.getMonth() + 1);
         }
     }
@@ -1067,6 +1287,8 @@ function aggregateExpenses(raw, range) {
                 groups[key].water += item.amount;
             } else if (item.type === 'other') {
                 groups[key].other += item.amount;
+            } else if (item.type === 'fertilizer') {
+                groups[key].fertilizer += item.amount;
             }
         }
     });
@@ -1076,7 +1298,8 @@ function aggregateExpenses(raw, range) {
         labels: keys.map(k => groups[k].label),
         pesticide: keys.map(k => groups[k].pesticide),
         water: keys.map(k => groups[k].water),
-        other: keys.map(k => groups[k].other)
+        other: keys.map(k => groups[k].other),
+        fertilizer: keys.map(k => groups[k].fertilizer)
     };
 }
 
@@ -1466,6 +1689,12 @@ function setupEventListeners() {
     navDashboard.addEventListener('click', (e) => { e.preventDefault(); switchView('dashboard'); });
     navSprays.addEventListener('click', (e) => { e.preventDefault(); switchView('sprays'); });
     navIrrigations.addEventListener('click', (e) => { e.preventDefault(); switchView('irrigations'); });
+    
+    const navFert = document.getElementById('nav-fertilizations');
+    if (navFert) {
+        navFert.addEventListener('click', (e) => { e.preventDefault(); switchView('fertilizations'); });
+    }
+    
     navOtherExpenses.addEventListener('click', (e) => { e.preventDefault(); switchView('other-expenses'); });
     navExpenses.addEventListener('click', (e) => { e.preventDefault(); switchView('expenses'); });
     navSettings.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
@@ -1477,6 +1706,7 @@ function setupEventListeners() {
     // Dashboard navigation links
     document.getElementById('dashboard-to-sprays').addEventListener('click', (e) => { e.preventDefault(); switchView('sprays'); });
     document.getElementById('dashboard-to-irrigations').addEventListener('click', (e) => { e.preventDefault(); switchView('irrigations'); });
+    document.getElementById('dashboard-to-fertilizations').addEventListener('click', (e) => { e.preventDefault(); switchView('fertilizations'); });
     document.getElementById('dashboard-to-other-expenses').addEventListener('click', (e) => { e.preventDefault(); switchView('other-expenses'); });
 
     // Decoupled sprays filter and search
@@ -1510,6 +1740,13 @@ function setupEventListeners() {
     cancelIrrigationModalBtn.addEventListener('click', () => irrigationModal.classList.remove('open'));
     irrigationModal.addEventListener('click', (e) => { if (e.target === irrigationModal) irrigationModal.classList.remove('open'); });
     irrigationForm.addEventListener('submit', (e) => { e.preventDefault(); saveIrrigation(); });
+
+    // Fertilization Modal Controls
+    if (openFertilizationModalBtn) openFertilizationModalBtn.addEventListener('click', openFertilizationAddModal);
+    if (closeFertilizationModalBtn) closeFertilizationModalBtn.addEventListener('click', () => fertilizationModal.classList.remove('open'));
+    if (cancelFertilizationModalBtn) cancelFertilizationModalBtn.addEventListener('click', () => fertilizationModal.classList.remove('open'));
+    fertilizationModal.addEventListener('click', (e) => { if (e.target === fertilizationModal) fertilizationModal.classList.remove('open'); });
+    fertilizationForm.addEventListener('submit', (e) => { e.preventDefault(); saveFertilization(); });
 
     // Other Expenses Modal Controls
     openOtherExpenseModalBtn.addEventListener('click', openOtherExpenseAddModal);
@@ -1632,6 +1869,7 @@ function handleLogoutAction() {
     
     sprays = [];
     irrigations = [];
+    fertilizations = [];
     otherExpenses = [];
     rawExpensesData = [];
     
