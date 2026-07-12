@@ -1863,7 +1863,7 @@ async function saveForm() {
 function setupEventListeners() {
     // Sidebar Field select change
     sidebarFieldSelect.addEventListener('change', handleFieldChange);
-    sidebarAddFieldBtn.addEventListener('click', openFieldAddFieldModal);
+    sidebarAddFieldBtn.addEventListener('click', openFieldAddModal);
     
     // Field Add Modal Controls
     if (closeFieldModalBtn) closeFieldModalBtn.addEventListener('click', () => fieldModal.classList.remove('open'));

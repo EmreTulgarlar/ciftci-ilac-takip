@@ -1228,16 +1228,18 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    width: 100%;
 }
 
 #sidebar-field-select {
     flex: 1;
     height: 36px;
+    box-sizing: border-box;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #ffffff;
     border-radius: 10px;
-    padding: 0 12px;
+    padding: 0 8px;
     font-size: 0.82rem;
     font-weight: 500;
     font-family: inherit;
@@ -1255,6 +1257,7 @@ body {
     width: 36px;
     height: 36px;
     min-width: 36px;
+    box-sizing: border-box;
     background: rgba(0, 230, 118, 0.12);
     border: 1px solid rgba(0, 230, 118, 0.25);
     color: #00e676;
@@ -1267,6 +1270,7 @@ body {
     font-size: 1.25rem;
     font-weight: bold;
     padding: 0;
+    line-height: 1;
 }
 
 #sidebar-add-field-btn:hover {
